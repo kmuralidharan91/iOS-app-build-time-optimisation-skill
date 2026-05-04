@@ -32,7 +32,7 @@ If the user is asking *why* the build is slow, prefer `ios-build-diagnose`. If t
 | `--touch-file PATH` | when `incremental` is in `--build-types` | — | File to `touch` between incremental repeats. |
 | `--variance-threshold N` | no | `10.0` | Spread-as-percent-of-median above which `high_variance` fires. |
 | `--regression-window N` | no | `5` | History runs (same branch) compared against. |
-| `--output-dir DIR` | yes | — | Where `benchmark.json`, per-run logs, and `.xcresult` bundles go. |
+| `--output-dir DIR` | yes | — | Where `measurement.json`, per-run logs, and `.xcresult` bundles go. |
 | `--extra-xcodebuild-arg ARG` | no | — | Repeatable; forwarded verbatim to `xcodebuild`. |
 
 ## Workflow
@@ -42,7 +42,7 @@ If the user is asking *why* the build is slow, prefer `ios-build-diagnose`. If t
 3. **Aggregate** per-build-type summaries: `min_seconds`, `max_seconds`, `median_seconds`, `mean_seconds`, `spread_seconds`, `spread_percent`. `high_variance` fires when `spread_percent` exceeds `--variance-threshold` and `count ≥ 2`.
 4. **Derive** `critical_path` per build type from the most recent run's stdout log (preferred) or `.xcresult` bundle (fallback). Phase A ships the task-class-aggregate method; per-target DAG attribution lands in Phase A.
 5. **Compare** against `<project>/.build-history/runs/` for the same branch; flag regression when current median exceeds historical median-of-medians by more than `--variance-threshold` percent on any build type.
-6. **Persist** the artifact to `--output-dir/benchmark.json` AND to `<project>/.build-history/runs/<timestamp>__sha-<sha>__<scheme>-<config>.json`.
+6. **Persist** the artifact to `--output-dir/measurement.json` AND to `<project>/.build-history/runs/<timestamp>__sha-<sha>__<scheme>-<config>.json`.
 
 When `high_variance` fires AND `--repeats < 5`, a Warning is emitted to stderr and appended to the artifact's `notes` array recommending `--repeats=5`.
 
@@ -74,6 +74,6 @@ Top-level fields:
 
 - Apple [`xcodebuild` man page mirror](https://keith.github.io/xcode-man-pages/xcodebuild.1.html) for `-showBuildTimingSummary` / `-resultBundlePath`.
 - Apple [Build System overview](https://developer.apple.com/documentation/xcode/build-system).
-- [Tuist manifests guide](https://docs.tuist.dev/en/guides/features/projects/manifests) — `Project.swift` detection rule.
+- [Tuist manifests guide](https://tuist.dev/en/docs/guides/features/projects/manifests) — `Project.swift` detection rule.
 - [Bazel and Apple](https://bazel.build/docs/bazel-and-apple) + [`rules_apple`](https://github.com/bazelbuild/rules_apple) — `MODULE.bazel` / `WORKSPACE` + `BUILD` detection rule.
 - This skill bundles its own copy of `scripts/` and `schemas/`. Verify drift with `python3 scripts/verify-sync.py` from the repo root.

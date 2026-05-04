@@ -200,10 +200,10 @@ def main(argv: list[str] | None = None) -> int:
     for bt, summary in summaries.items():
         if summary["high_variance"] and args.repeats < 5:
             warning = (
-                f"Warning: high variance for {bt}: spread "
-                f"{summary['spread_percent']:.2f}% of median exceeds threshold "
-                f"{args.variance_threshold:.1f}%. Re-run with --repeats=5 to "
-                f"tighten the confidence interval."
+                f"NOTE: {bt} measurement is noisy — observed spread is "
+                f"{summary['spread_percent']:.2f}% of the median, above the "
+                f"{args.variance_threshold:.1f}% threshold. Re-run with "
+                f"--repeats 5 to narrow the variance window."
             )
             print(warning, file=sys.stderr)
             notes.append(warning)
@@ -252,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
         print(msg, file=sys.stderr)
         artifact["notes"].append(msg)
 
-    artifact_path = output_dir / "benchmark.json"
+    artifact_path = output_dir / "measurement.json"
     artifact_path.write_text(json.dumps(artifact, indent=2, sort_keys=True))
     print(f"wrote: {artifact_path}", file=sys.stderr)
 
@@ -343,9 +343,35 @@ def _git_branch(project_path: pathlib.Path) -> str | None:
             cwd=project_path, capture_output=True, text=True, check=True,
         )
         branch = result.stdout.strip()
-        return branch if branch and branch != "HEAD" else None
+        if branch and branch != "HEAD":
+            return branch
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
+
+    # Detached HEAD (common in worktrees / CI): try to find a remote
+    # branch whose tip matches our HEAD SHA. Returns the first match,
+    # stripped of the remote prefix (e.g., "origin/develop" -> "develop").
+    try:
+        head_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project_path, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        for_each = subprocess.run(
+            ["git", "for-each-ref", "--points-at", head_sha,
+             "--format=%(refname:short)", "refs/remotes/"],
+            cwd=project_path, capture_output=True, text=True, check=True,
+        )
+        for line in for_each.stdout.splitlines():
+            line = line.strip()
+            if not line or line.endswith("/HEAD") or "/" not in line:
+                # "/" not in line catches the bare remote-name short ref
+                # (e.g. "origin" rendered from refs/remotes/origin/HEAD).
+                continue
+            # "origin/develop" -> "develop"; first match wins
+            return line.split("/", 1)[-1]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    return None
 
 
 if __name__ == "__main__":
