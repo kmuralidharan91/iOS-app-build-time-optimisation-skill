@@ -1,30 +1,52 @@
 # CHECKS.md — developer-facing summary of every diagnose check
 
-> **Status — placeholder.** Populated in Phase A when `ios-build-diagnose` and `references/build-settings-best-practices.md` ship. Each row will list: rule id, check name, what it inspects, when it fires, wall-clock impact category, and which Apple/WWDC/Tuist/Bazel source it cites.
+> Authoritative TOC of every rule the v1 diagnose pass surfaces. Use this
+> file as the at-a-glance index; the per-rule reasoning lives in
+> [`references/build-settings-best-practices.md`](references/build-settings-best-practices.md),
+> [`references/defaults.md`](references/defaults.md), and the analyzer
+> source under [`scripts/analyzers/`](scripts/analyzers/).
 
-## Layout (final form, after Phase A)
+## `findings[]` rules (counted toward the F1–F9 effectiveness gate)
 
-| Rule id | Check | Inspects | Fires when | Impact | Citation |
-| --- | --- | --- | --- | --- | --- |
-| _xcb-001_ | _example placeholder_ | _setting / phase / file_ | _condition_ | _high / medium / low_ | _Apple docs URL or WWDC session_ |
-| _… | _… | _… | _… | _… | _…_ |
+| Rule id | Family | Inspects | Fires when | Impact | Citation |
+| --- | --- | --- | --- | :---: | --- |
+| `script-phase/random-sleep` | script-phase | Phase body + every invoked `.sh` file (followed via `bash $SRCROOT/...sh` resolution) | `sleep $RANDOM` regex match (`sleep $[(...$RANDOM...)]`, `sleep $((RANDOM%N))`, etc.) | high | [WWDC22 110364](https://developer.apple.com/videos/play/wwdc2022/110364/) |
+| `script-phase/missing-debug-guard` | script-phase | Artifact-upload phases (name + body + invoked-script body) for a `CONFIGURATION` reference | Keyword match (`firebase`, `crashlytics`, `upload`, `dsym`, `fullstory`, `datadog`, `sentry`, `bugsnag`) AND no `CONFIGURATION` reference in the extended body | medium | [WWDC22 110364](https://developer.apple.com/videos/play/wwdc2022/110364/) |
+| `script-phase/missing-output-declarations` | script-phase | `PBXShellScriptBuildPhase.outputPaths` | `outputPaths == []` | high (`alwaysOutOfDate=False`) / medium (`alwaysOutOfDate=True`) | [WWDC22 110364](https://developer.apple.com/videos/play/wwdc2022/110364/), [Xcode 14 release notes](https://developer.apple.com/documentation/xcode-release-notes/xcode-14-release-notes) |
+| `script-phase/swiftlint-on-build` | script-phase | Phase name + body + invoked-script body | Regex `\bswiftlint\b` match | low | [WWDC22 110364](https://developer.apple.com/videos/play/wwdc2022/110364/) |
+| `build-setting/compilation-cache-disabled` | build-setting | `xcodebuild -showBuildSettings` resolved value of `COMPILATION_CACHE_ENABLE_CACHING` (PR-#1 effective-settings semantics) | resolved value ≠ `YES` | high | [Apple Build Settings Reference](https://developer.apple.com/documentation/xcode/build-settings-reference) |
+| `build-setting/eager-linking-disabled` | build-setting | `xcodebuild -showBuildSettings` resolved value of `EAGER_LINKING` | resolved value ≠ `YES` | low | [Apple Build Settings Reference](https://developer.apple.com/documentation/xcode/build-settings-reference) |
+| `asset-catalog/incremental-recompile` | asset-catalog | Phase A `measurement.json` `critical_path.incremental.nodes` | `CompileAssetCatalogVariant` `duration_seconds` ≥ 3.0 (tolerates both `dominant_task`/`duration_seconds` and `class_name`/`total_seconds` field shapes) | medium / high | [Apple Asset Management](https://developer.apple.com/documentation/xcode/asset-management) |
+| `spm/swift-syntax-not-prebuilt` | spm | Every reachable `Package.resolved` | A pin's `identity == "swift-syntax"` exists | medium | [Xcode 26 release notes](https://developer.apple.com/documentation/xcode-release-notes/xcode-26-release-notes) — prebuilt-swift-syntax claim **UNVERIFIED at line level until Phase A confirms** |
+| `spm/oversized-module` | spm | Every local `Package.swift` with a `*.swift` source-file count per module | `source_count ≥ 200` (high tier ≥ 600; medium tier ≥ 200) | high / medium | [Apple Swift Packages](https://developer.apple.com/documentation/xcode/swift-packages) |
 
-## Categories of checks (planned in Phase A)
+## `additional_recommendations[]` rules (PR-#2 audit; counted separately so the F1–F9 recall denominator stays unambiguous)
 
-- **Build settings hygiene** — effective values resolved via `xcodebuild -showBuildSettings`, comparing pbxproj-explicit vs Xcode-default-resolved.
-- **Script phases** — `ENABLE_USER_SCRIPT_SANDBOXING`, `FUSE_BUILD_SCRIPT_PHASES`, output-file declarations, parallelism barriers.
-- **Swift compilation** — type-checker hotspots, `-debug-time-function-bodies` outliers, large generic instantiations, expression-checker timeouts.
-- **Module graph** — circular dependencies, oversized targets, missing `DEFINES_MODULE`, suboptimal explicit-modules configuration.
-- **Package graph** — SPM resolution overhead, duplicate module variants, circular package deps, build-plugin overhead.
-- **Tuist-specific** — manifest cache health, oversized graphs, target dependencies that defeat Tuist's caching.
-- **Bazel-specific** — non-cacheable rules, rule_apple version drift, rules_swift modes (explicit modules, integrated driver).
+| Rule id | Family | Inspects | Fires when | Impact | Citation |
+| --- | --- | --- | --- | :---: | --- |
+| `build-setting/script-sandboxing-disabled` | build-setting | `xcodebuild -showBuildSettings` resolved value of `ENABLE_USER_SCRIPT_SANDBOXING` | resolved value ≠ `YES` | medium (indirect — preconditions FUSE_BUILD_SCRIPT_PHASES) | [WWDC22 110364](https://developer.apple.com/videos/play/wwdc2022/110364/) |
+| `build-setting/fuse-build-script-phases-disabled` | build-setting | `xcodebuild -showBuildSettings` resolved value of `FUSE_BUILD_SCRIPT_PHASES` | resolved value ≠ `YES` | medium (project-shape sensitive) | [WWDC22 110364](https://developer.apple.com/videos/play/wwdc2022/110364/) |
+
+## Suppression rules (intentionally do NOT surface)
+
+| Rule id | What | Suppressed when |
+| --- | --- | --- |
+| `spm/branch-pinned` | Package pinned by branch instead of version | Pin's `version != null` (R1 in the Phase A ground truth — `REDACTED` is now `version=0.0.11`, so the rule does **not** fire and surfacing it would count as a false positive against the Phase A effectiveness gate) |
+
+## Coverage boundaries
+
+- **Adapter coverage**: v1 ships diagnose only on the Xcode adapter. The Tuist + Bazel adapter `script_phases`, `package_graph`, `show_build_settings` calls raise `NotImplementedError`. Diagnose for those build systems lands in v1.x.
+- **Platform coverage**: v1 fences `platform="ios"`. Other platforms are accepted by the questionnaire but rejected with a "v2 not yet" error.
+- **Critical-path inference**: see [`references/critical-path-method.md`](references/critical-path-method.md) — v1 uses `task-class-aggregate`, NOT a per-target DAG walk. Diagnose's asset-catalog rule reads the Phase A emit shape; per-target DAG attribution is its own deferred workstream.
 
 ## Sources of truth
 
-- `references/build-settings-best-practices.md` — the per-setting deep dive (Phase A deliverable).
-- `references/sources.md` — full citation index (Phase A deliverable).
-- `references/defaults.md` — every threshold and heuristic with its tuning project + run (Phase A deliverable).
+- [`references/build-settings-best-practices.md`](references/build-settings-best-practices.md) — Why / Recommended / Measurement / Risk for every build-setting rule (incl. WWDC22 110364 verbatim quotes, single-line block-quote form so `grep -F` byte-identity holds against the on-disk transcript at `~/Desktop/Command+B/transcripts/xcode-build-parallelization-wwdc2022.md`).
+- [`references/sources.md`](references/sources.md) — every citation URL with verification date.
+- [`references/defaults.md`](references/defaults.md) — every threshold + heuristic tied to its REDACTED reference data point (the project + run that motivated it).
+- [`scripts/analyzers/`](scripts/analyzers/) — the actual rule implementations (`script_phase.py`, `build_setting.py`, `asset_catalog.py`, `spm_graph.py`, plus the `Finding`/`Recommendation` dataclasses in `__init__.py`).
+- [`schemas/diagnosis.schema.json`](schemas/diagnosis.schema.json) — Draft 2020-12 schema (v1.0.0) every diagnose artifact validates against.
 
-## Until Phase A
+## Phase A additions (simulation predictors)
 
-Treat this file as a TOC stub. The actual checks live in code (`scripts/diagnose.py`) and in the references (`references/`). Once Phase A lands, this file becomes the at-a-glance index every developer reads first.
+When Phase A ships, this file gains a "Simulation predictors" section listing each rule's prediction function under [`scripts/simulators/`](scripts/simulators/) with its tuning data point (the project + run that motivated the predicted Δ wall-clock). Until then, the static `wall_clock_predicted_seconds` block on each finding is the canonical predicted-Δ source.

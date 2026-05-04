@@ -1,0 +1,137 @@
+# Build-setting recommendations — `references/build-settings-best-practices.md`
+
+> Companion file to `scripts/analyzers/build_setting.py`. Every audit
+> entry below carries a **Why**, **Recommended**, **Measurement**, and
+> **Risk** subsection. WWDC quotes are byte-identical against the
+> on-disk transcript at
+> `~/Desktop/Command+B/transcripts/xcode-build-parallelization-wwdc2022.md`
+> (verified with `grep -F` in Phase A; see `docs/verification/2.md`).
+
+## `COMPILATION_CACHE_ENABLE_CACHING`
+
+Rule id: `build-setting/compilation-cache-disabled` (F4 ground truth).
+
+**Why.** Xcode 16+ ships a project-independent on-disk compilation
+cache. Setting `COMPILATION_CACHE_ENABLE_CACHING=YES` lets the
+build system reuse compile artifacts across `clean`, branch
+checkouts, and simulator OS bumps — work that would otherwise
+recompute even after a one-line code change provided the changed
+file's downstream cone overlaps cached artifacts.
+
+**Recommended.** `YES` for Debug (and any local-development
+configuration). Leave Release / Distribution decisions to the team
+that ships builds — release pipelines often want `clean` semantics
+to avoid masking determinism bugs.
+
+**Measurement.** On the REDACTED `develop` baseline
+(2026-04-26 measurement), a warm-cache clean Debug+sim build came in
+**~45.6% faster** than the cold-cache equivalent (≈125s saved on a
+275s baseline). Numbers will vary with project shape; Phase A+
+records the per-project tuning data point.
+
+**Risk.** Incremental builds can pay a small cache-invalidation cost
+(REDACTED measured ~10s extra on touched-file change) because the cache
+sees a wider invalidation cone than Xcode's per-target incremental
+tracker. Net positive on every REDACTED measurement so far, but track the
+per-project trade-off rather than enabling blindly.
+
+## `EAGER_LINKING`
+
+Rule id: `build-setting/eager-linking-disabled` (F9 ground truth).
+
+**Why.** WWDC22 110364 introduced eager linking: a downstream
+target can begin its `Ld` task as soon as the upstream target's
+`emit-module` task completes, instead of waiting for the upstream
+`Ld` to finish first. Shortens the critical path on projects whose
+linker waits dominate Debug builds.
+
+**Recommended.** `YES` is the documented default for projects that
+fit the eager-link shape (pure-Swift dynamic frameworks linked by
+their dependents). Diagnose flags `unset` / `NO` and lets simulate +
+fix decide whether the project's actual graph benefits.
+
+**Measurement.** On REDACTED Phase v1→v2, enabling `EAGER_LINKING`
+measured **zero clean-build improvement** and the change was
+reverted in the user-vetted `optimization-plan.md`. F9's
+`impact_category=low` reflects that. Wikipedia iOS / NetNewsWire
+checkouts will tune this more in Phase A+.
+
+**Risk.** Almost none — the optimisation only changes scheduling.
+The mitigation when impact is null is to revert; the Phase A
+`ios-build-fix` re-measure step refuses to claim success when delta
+is null or regressive, which catches this case automatically.
+
+## `ENABLE_USER_SCRIPT_SANDBOXING`
+
+Rule id: `build-setting/script-sandboxing-disabled` (PR-#2;
+`additional_recommendations[]`).
+
+**Why.** WWDC22 110364, verbatim:
+
+> Sandboxing is an opt-in feature that blocks shell scripts from accidentally accessing source files and intermediate build objects, unless those are explicitly declared as an input or output for the phase.
+
+Sandboxing is the precondition for `FUSE_BUILD_SCRIPT_PHASES` parallelisation.
+
+**Recommended.** `YES`. The same WWDC22 session, verbatim:
+
+> To enable Sandboxed Shell Scripts for a target, set ENABLE_USER_SCRIPT_SANDBOXING to YES in the build settings editor or an xcconfig file.
+
+Apply per target (and as a project-default once existing phases have correct input/output declarations).
+
+**Measurement.** Indirect — sandboxing itself does not cut wall-clock. The wall-clock win comes from the `inputPaths` / `outputPaths` audit it forces (every undeclared input becomes a build error), which is what lets the build system correctly skip phases when inputs are unchanged. WWDC22 110364, verbatim:
+
+> sandboxed shell scripts allow having correct dependency information to enable faster and more robust incremental builds since the build system has the confidence to skip script phases if the inputs haven't changed and the outputs are still valid
+
+**Risk.** Existing phases with undeclared dependencies will fail to
+build until they're fixed. Apply incrementally, target-by-target;
+Phase A `ios-build-fix` carries the per-finding refusal-when-broken
+guarantee.
+
+## `FUSE_BUILD_SCRIPT_PHASES`
+
+Rule id: `build-setting/fuse-build-script-phases-disabled` (PR-#2;
+`additional_recommendations[]`).
+
+**Why.** WWDC22 110364 introduced parallel script-phase execution. Verbatim:
+
+> If the scripts in a target are configured to run based on dependency analysis and specify their complete list of inputs and outputs, then the build setting FUSE_BUILD_SCRIPT_PHASES can be set to YES to indicate the build system should attempt to run them in parallel.
+
+Without it, all script phases on a target serialise.
+
+**Recommended.** `YES`, **after** sandboxing is on and every phase
+declares its inputs / outputs. The rule's `notes[]` reminds the user
+of that prerequisite ordering.
+
+**Measurement.** Wall-clock win scales with phase count and the
+spawn / setup overhead per phase. REDACTED has 14
+`PBXShellScriptBuildPhase` entries on `develop` @ `REDACTED`; the
+fuse win amortises shell-startup time across the phase chain.
+Project-shape sensitive — Phase A+ records measured-on-REDACTED numbers
+once the prerequisite (correct input/output declarations on every
+phase, F3 finding family) is applied.
+
+**Risk.** WWDC22 110364, verbatim:
+
+> However, when running script phases in parallel, the build system has to rely on the specified inputs and outputs. So be aware that an incomplete list of the inputs or outputs of a script phase can lead to data races which are very hard to debug.
+
+Mitigation: enable sandboxing first; sandbox failure mode surfaces undeclared dependencies as build errors instead of silent data races.
+
+## How analyzers read this file
+
+`scripts/analyzers/build_setting.py` does **not** parse this file at
+runtime — every rule body has the rule id, the WWDC / Apple URL,
+and the impact category baked into the analyzer source. This file
+is the human-facing reference that the SKILL.md links to and that
+Phase A simulate / Phase A fix consume to construct user-facing
+explanations.
+
+When Phase A+ adds a new build-setting rule, the workflow is:
+
+1. Add a section to this file using the **Why / Recommended /
+   Measurement / Risk** pattern.
+2. Add the rule to `scripts/analyzers/build_setting.py` with a
+   citation pointing at the same WWDC/Apple URL.
+3. Add the citation row to `references/sources.md` with a
+   verification date.
+4. `grep -F` any verbatim quote against its on-disk source and log
+   the result in the chat's `docs/verification/<chat>.md`.
