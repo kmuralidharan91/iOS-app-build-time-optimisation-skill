@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kmuralidharan91/iOS-app-build-time-optimisation-skill/schemas/history.schema.json",
+  "title": "ios-build-measure cross-run history",
+  "description": "On-disk shape of <project>/.build-history/. The runs/ directory holds one JSON file per measurement (each conforms to build-benchmark.schema.json); index.json is a roll-up cache regenerated on every write_run().",
+  "oneOf": [
+    {"$ref": "#/$defs/index_payload"},
+    {"$ref": "#/$defs/run_pointer"}
+  ],
+  "$defs": {
+    "index_payload": {
+      "type": "object",
+      "required": ["schema", "updated_at", "by_branch"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string",
+          "enum": ["ios-build-measure-history-index/1.0.0"]
+        },
+        "updated_at": {"type": "string"},
+        "by_branch": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/index_entry"}
+          }
+        }
+      }
+    },
+    "index_entry": {
+      "type": "object",
+      "required": ["file", "git_sha", "generated_at"],
+      "additionalProperties": false,
+      "properties": {
+        "file": {"type": "string"},
+        "git_sha": {"type": "string"},
+        "generated_at": {"type": "string"},
+        "median_clean_seconds": {"type": ["number", "null"]},
+        "median_incremental_seconds": {"type": ["number", "null"]}
+      }
+    },
+    "run_pointer": {
+      "type": "object",
+      "description": "Sentinel reminder that runs/<file>.json conforms to build-benchmark.schema.json; not used directly but documents the relationship.",
+      "required": ["see"],
+      "additionalProperties": true,
+      "properties": {
+        "see": {
+          "type": "string",
+          "enum": ["build-benchmark.schema.json"]
+        }
+      }
+    }
+  }
+}

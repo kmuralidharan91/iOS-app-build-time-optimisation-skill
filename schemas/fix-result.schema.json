@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kmuralidharan91/iOS-app-build-time-optimisation-skill/schemas/fix-result.schema.json",
+  "title": "ios-build-fix output",
+  "description": "Outcome of applying a single ios-build-diagnose finding (or group of same-rule findings) to a real Xcode project on a throwaway branch, with pre- and post-fix measurements. The fixer refuses to claim success when the actual wall-clock delta is null, regressive, or within variance noise; outcome carries that verdict explicitly. Read alongside the diagnosis and (optionally) simulation artifacts that drove the fix decision.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool",
+    "generated_at",
+    "inputs",
+    "target",
+    "applied_fix",
+    "measurement_pre",
+    "measurement_post",
+    "actual_delta",
+    "variance_threshold_percent",
+    "outcome",
+    "outcome_reason",
+    "tuning_data_point",
+    "notes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "const": "ios-build-fix" },
+        "version": { "type": "string" }
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["diagnosis_artifact_path", "rule_id", "project_root", "branch"],
+      "additionalProperties": false,
+      "properties": {
+        "diagnosis_artifact_path": { "type": "string" },
+        "simulation_artifact_path": { "type": ["string", "null"] },
+        "rule_id": { "type": "string" },
+        "project_root": { "type": "string" },
+        "branch": { "type": "string" },
+        "auto_approve": { "type": "boolean" },
+        "allow_refusal": { "type": "boolean" },
+        "reuse_measurement_pre_path": { "type": ["string", "null"] }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["rule_id", "family", "source_finding_indices", "predicted"],
+      "additionalProperties": false,
+      "description": "The diagnose finding(s) this fix targets. source_finding_indices points back into diagnosis.findings[] (non-negative) or additional_recommendations[] via the -1-N convention (mirrors simulation.schema).",
+      "properties": {
+        "rule_id": { "type": "string" },
+        "family": {
+          "type": "string",
+          "enum": ["script-phase", "build-setting", "asset-catalog", "spm"]
+        },
+        "source_finding_indices": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "predicted": {
+          "type": "object",
+          "required": ["clean", "incremental"],
+          "additionalProperties": false,
+          "description": "Predicted clean and incremental delta seconds from the simulation artifact, when one was supplied. Both null when no simulation artifact was loaded.",
+          "properties": {
+            "clean": {
+              "type": "object",
+              "required": ["delta_seconds"],
+              "additionalProperties": false,
+              "properties": {
+                "delta_seconds": { "type": ["number", "null"] }
+              }
+            },
+            "incremental": {
+              "type": "object",
+              "required": ["delta_seconds"],
+              "additionalProperties": false,
+              "properties": {
+                "delta_seconds": { "type": ["number", "null"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "applied_fix": {
+      "type": "object",
+      "required": ["kind", "files_modified", "git_sha_before", "git_sha_after", "submodule_changes"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "delete-line",
+            "edit-xcconfig",
+            "edit-pbxproj",
+            "compound",
+            "no-op"
+          ]
+        },
+        "files_modified": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Repository-relative paths of every file touched by the fix."
+        },
+        "git_sha_before": { "type": "string" },
+        "git_sha_after": { "type": "string" },
+        "submodule_changes": {
+          "type": "array",
+          "description": "If the fix lives in a submodule, the submodule path and its before/after commit SHAs.",
+          "items": {
+            "type": "object",
+            "required": ["path", "sha_before", "sha_after"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "sha_before": { "type": "string" },
+              "sha_after": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "measurement_pre": {
+      "$ref": "#/$defs/MeasurementRef"
+    },
+    "measurement_post": {
+      "$ref": "#/$defs/MeasurementRef"
+    },
+    "actual_delta": {
+      "type": "object",
+      "required": ["clean", "incremental"],
+      "additionalProperties": false,
+      "properties": {
+        "clean": { "$ref": "#/$defs/AxisDelta" },
+        "incremental": { "$ref": "#/$defs/AxisDelta" }
+      }
+    },
+    "variance_threshold_percent": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Percent-of-baseline floor below which |delta| is classified as noise. Default 10.0 — matches Phase A measure-gate spec and Phase A clean-build observed spread (11.21% at repeats=5)."
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "success",
+        "refused-null",
+        "refused-regressive",
+        "refused-noise",
+        "refused-apply-error",
+        "refused-benchmark-error"
+      ],
+      "description": "The fixer's verdict. success = at least one axis with a meaningful improvement. refused-null = relevant axis missing in measurement (e.g. clean axis requested but post-measurement only has incremental). refused-regressive = delta non-negative on every measured axis. refused-noise = |delta| within variance_threshold_percent on every measured axis. refused-apply-error = fix could not be applied; tree reset. refused-benchmark-error = pre or post measurement crashed."
+    },
+    "outcome_reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-sentence human-readable explanation of the outcome decision (e.g. 'incremental delta -4.4s on 51.8s baseline = 8.5% < 10% variance threshold')."
+    },
+    "tuning_data_point": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required (mirror simulate schema): project + run + observed delta to feed back into the next iteration of the simulate predictor. E.g. 'REDACTED REDACTED + gh-skill-test/Phase A-F1: F1 random-sleep removed -> incremental Δ -5.7s on 51.8s baseline (predicted -5.5s, within ±50%)'."
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "MeasurementRef": {
+      "type": "object",
+      "required": ["path", "git_sha", "schema_version"],
+      "additionalProperties": false,
+      "description": "Reference to a measurement.json artifact produced by ios-build-measure. We do not inline the full artifact; the path is required for traceability and the schema_version + git_sha are pinned in this record so a stale measurement is detectable.",
+      "properties": {
+        "path": { "type": "string" },
+        "git_sha": { "type": "string" },
+        "schema_version": { "type": "string" },
+        "summary_clean_median_seconds": { "type": ["number", "null"] },
+        "summary_incremental_median_seconds": { "type": ["number", "null"] },
+        "summary_clean_spread_percent": { "type": ["number", "null"] },
+        "summary_incremental_spread_percent": { "type": ["number", "null"] }
+      }
+    },
+    "AxisDelta": {
+      "type": "object",
+      "required": [
+        "delta_seconds",
+        "baseline_median_seconds",
+        "post_median_seconds",
+        "spread_pre_percent",
+        "spread_post_percent",
+        "exceeds_variance",
+        "within_predicted_band"
+      ],
+      "additionalProperties": false,
+      "description": "Per-axis (clean or incremental) actual-vs-baseline delta. delta_seconds = post_median - baseline_median (negative = improvement). exceeds_variance true iff |delta_seconds| > variance_threshold_percent * max(baseline_median, post_median) / 100. within_predicted_band true iff |delta - predicted| <= 0.5 * |predicted| (the Phase A ±50% rule from PLAN.md Verification §Simulate gate); null when predicted is null.",
+      "properties": {
+        "delta_seconds": { "type": ["number", "null"] },
+        "baseline_median_seconds": { "type": ["number", "null"] },
+        "post_median_seconds": { "type": ["number", "null"] },
+        "spread_pre_percent": { "type": ["number", "null"] },
+        "spread_post_percent": { "type": ["number", "null"] },
+        "exceeds_variance": { "type": "boolean" },
+        "within_predicted_band": { "type": ["boolean", "null"] }
+      }
+    }
+  }
+}
