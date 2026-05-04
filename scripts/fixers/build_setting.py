@@ -128,7 +128,9 @@ def _append_xcconfig_setting(
     xcconfig.write_text(text.rstrip() + "\n" + block)
 
     rel = _relpath(ctx.project_root, xcconfig)
-    _stage_and_commit(ctx.project_root, [rel], commit_msg)
+    _stage_and_commit(
+        ctx.project_root, [rel], commit_msg, no_verify=ctx.no_verify_commits
+    )
     submodule_changes = _detect_submodule_changes(ctx.project_root, [rel])
     sha_after = _git_head(ctx.project_root)
     return AppliedFix(
@@ -163,12 +165,13 @@ def _stage_and_commit(
     project_root: pathlib.Path,
     rel_paths: list[str],
     message: str,
+    no_verify: bool = False,
 ) -> None:
     # Same logic as script_phase._stage_and_commit. Re-imported here to
     # keep the modules independent (mirrors the simulators/ shape).
     from .script_phase import _stage_and_commit as _impl
 
-    _impl(project_root, rel_paths, message)
+    _impl(project_root, rel_paths, message, no_verify=no_verify)
 
 
 def _detect_submodule_changes(

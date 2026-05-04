@@ -96,6 +96,7 @@ def apply_random_sleep(
         files_modified,
         "F1: remove random sleep from script phases\n\n"
         f"Touches {len(files_modified)} file(s); rule_id=script-phase/random-sleep.",
+        no_verify=ctx.no_verify_commits,
     )
     submodule_changes = _detect_submodule_changes(ctx.project_root, files_modified)
 
@@ -114,16 +115,29 @@ def preview_missing_output_declarations(
     findings: list[tuple[int, dict[str, Any]]],
     ctx: FixContext,
 ) -> str:
-    """Return a human-readable preview for the F3 fix."""
+    """Return a human-readable preview for the F3 fix.
+
+    v1 only enables ``FUSE_BUILD_SCRIPT_PHASES``; the companion
+    ``ENABLE_USER_SCRIPT_SANDBOXING`` requires every existing script
+    phase to declare its inputs/outputs and breaks REDACTED's "Step 4 - Copy
+    Localizable Resources..." (and similar) until those declarations
+    land. Empirically validated 2026-05-04: enabling both together on
+    REDACTED ``develop`` @ ``REDACTED`` produces ``** BUILD FAILED **`` with
+    sandbox-denied PhaseScriptExecution. Predicted impact drops from
+    -15.5s combined (sandbox+fuse) to roughly the PR-#2 fuse-only band
+    of -7s clean / -5.6s incremental.
+    """
 
     xcconfig = _f3_xcconfig_target(ctx.project_root)
     return (
-        f"F3 missing-output-declarations — enable sandbox+fuse via "
+        f"F3 missing-output-declarations — enable fuse via "
         f"{xcconfig.relative_to(ctx.project_root)}:\n"
-        "  + ENABLE_USER_SCRIPT_SANDBOXING = YES\n"
         "  + FUSE_BUILD_SCRIPT_PHASES = YES\n"
-        f"({len(findings)} source finding(s) closed by this single edit; "
-        "explicit outputPaths can be added in a follow-up pass.)"
+        f"({len(findings)} source finding(s) closed by this single edit. "
+        "ENABLE_USER_SCRIPT_SANDBOXING is intentionally NOT set in v1 — "
+        "it requires explicit outputPaths on every existing script phase, "
+        "which is project-specific. Sandbox support lands in v1.x once "
+        "the pbxproj-edit fixer is implemented.)"
     )
 
 
@@ -131,34 +145,33 @@ def apply_missing_output_declarations(
     findings: list[tuple[int, dict[str, Any]]],
     ctx: FixContext,
 ) -> AppliedFix:
-    """Append ENABLE_USER_SCRIPT_SANDBOXING + FUSE_BUILD_SCRIPT_PHASES to the
-    Debug xcconfig. Idempotent: if either key is already present at the
-    top level, it is left as-is and the apply is treated as no-op.
+    """Append FUSE_BUILD_SCRIPT_PHASES = YES to the Debug xcconfig.
+
+    v1 deliberately scopes the F3 fix to fuse-only. Sandbox + outputPaths
+    is a v1.x enhancement (requires per-phase pbxproj edits). Empirically
+    validated 2026-05-04 against REDACTED develop @ REDACTED: sandbox ON
+    without outputPaths breaks "Step 4 - Copy Localizable Resources"
+    with sandbox-denied PhaseScriptExecution → ** BUILD FAILED **.
     """
 
     xcconfig = _f3_xcconfig_target(ctx.project_root)
     sha_before = _git_head(ctx.project_root)
     text = xcconfig.read_text()
-    additions = []
-    if not _xcconfig_has_setting(text, "ENABLE_USER_SCRIPT_SANDBOXING"):
-        additions.append("ENABLE_USER_SCRIPT_SANDBOXING = YES")
-    if not _xcconfig_has_setting(text, "FUSE_BUILD_SCRIPT_PHASES"):
-        additions.append("FUSE_BUILD_SCRIPT_PHASES = YES")
-    if not additions:
+    if _xcconfig_has_setting(text, "FUSE_BUILD_SCRIPT_PHASES"):
         return AppliedFix(
             kind="no-op",
             files_modified=(),
             git_sha_before=sha_before,
             git_sha_after=sha_before,
             submodule_changes=(),
-            notes="F3: both settings already present in xcconfig; nothing to apply.",
+            notes="F3: FUSE_BUILD_SCRIPT_PHASES already present in xcconfig.",
         )
 
     block = (
         "\n// MARK: - ios-build-fix F3 (script-phase/missing-output-declarations)\n"
-        "// Predicted Δ -15.5s combined per docs/smoke/3/scoring.md.\n"
-        + "\n".join(additions)
-        + "\n"
+        "// Predicted Δ -7s clean / -5.6s incremental (fuse-only; v1 omits\n"
+        "// sandbox until per-phase outputPaths fixer lands in v1.x).\n"
+        "FUSE_BUILD_SCRIPT_PHASES = YES\n"
     )
     new_text = text.rstrip() + "\n" + block
     xcconfig.write_text(new_text)
@@ -167,8 +180,11 @@ def apply_missing_output_declarations(
     _stage_and_commit(
         ctx.project_root,
         [rel],
-        "F3: enable script sandboxing + fuse build script phases\n\n"
-        "Closes diagnose findings rule_id=script-phase/missing-output-declarations.",
+        "F3: enable FUSE_BUILD_SCRIPT_PHASES (fuse-only; sandbox deferred)\n\n"
+        "Closes diagnose findings rule_id=script-phase/missing-output-declarations.\n"
+        "Sandbox NOT enabled — would break REDACTED's Step 4 phase until outputPaths "
+        "are declared per script phase (pbxproj edit, deferred to v1.x).",
+        no_verify=ctx.no_verify_commits,
     )
     submodule_changes = _detect_submodule_changes(ctx.project_root, [rel])
     sha_after = _git_head(ctx.project_root)
@@ -178,7 +194,7 @@ def apply_missing_output_declarations(
         git_sha_before=sha_before,
         git_sha_after=sha_after,
         submodule_changes=tuple(submodule_changes),
-        notes=f"Added {len(additions)} build setting(s) to {rel}.",
+        notes=f"Added FUSE_BUILD_SCRIPT_PHASES=YES to {rel}.",
     )
 
 
@@ -304,13 +320,20 @@ def _stage_and_commit(
     project_root: pathlib.Path,
     rel_paths: list[str],
     message: str,
+    no_verify: bool = False,
 ) -> None:
     """Stage + commit the given paths in their owning git tree.
 
     A path that lives inside a submodule is committed in the submodule
     first, then the submodule pointer update is committed in the parent.
+
+    When ``no_verify`` is true, ``--no-verify`` is forwarded to ``git
+    commit``. Used for throwaway test branches in foreign projects
+    whose hooks are about code-review compliance rather than
+    correctness; the orchestrator gates this behind a CLI flag.
     """
 
+    commit_extra = ["--no-verify"] if no_verify else []
     submodule_paths: dict[pathlib.Path, list[str]] = {}
     parent_paths: list[str] = []
 
@@ -325,8 +348,9 @@ def _stage_and_commit(
 
     for sub, paths in submodule_paths.items():
         subprocess.check_call(["git", "-C", str(sub), "add", "--", *paths])
-        subprocess.check_call(["git", "-C", str(sub), "commit", "-m", message])
-        # Stage the submodule pointer in the parent.
+        subprocess.check_call(
+            ["git", "-C", str(sub), "commit", *commit_extra, "-m", message]
+        )
         sub_rel = str(sub.relative_to(project_root.resolve()))
         subprocess.check_call(["git", "-C", str(project_root), "add", "--", sub_rel])
 
@@ -337,7 +361,7 @@ def _stage_and_commit(
 
     if submodule_paths or parent_paths:
         subprocess.check_call(
-            ["git", "-C", str(project_root), "commit", "-m", message]
+            ["git", "-C", str(project_root), "commit", *commit_extra, "-m", message]
         )
 
 

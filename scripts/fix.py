@@ -76,9 +76,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     project_root = args.project_root.resolve()
-    if not (project_root / ".git").exists() and not _is_git_worktree(project_root):
+    git_root = _find_git_root(project_root)
+    if git_root is None:
         print(
-            f"error: project_root {project_root} is not a git repo / worktree",
+            f"error: project_root {project_root} is not inside a git repo / worktree",
             file=sys.stderr,
         )
         return 2
@@ -93,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         project_root=project_root,
         branch=branch,
         auto_approve=args.auto_approve,
+        no_verify_commits=args.no_verify_commits,
     )
 
     # ----- Approval gate ---------------------------------------------------
@@ -355,6 +357,13 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
              "baseline (skips one benchmark run). Caller is responsible for "
              "ensuring it was taken at the right git SHA on the same machine.",
     )
+    parser.add_argument("--no-verify-commits", action="store_true",
+        help="Forward --no-verify to git commit. Use only for throwaway test "
+             "branches in foreign projects whose hooks are about code-review "
+             "compliance (e.g. JIRA-ticket name patterns) rather than "
+             "correctness validation. Never enable for the user's primary "
+             "working tree.",
+    )
     return parser.parse_args(argv)
 
 
@@ -393,6 +402,28 @@ def _is_git_worktree(path: pathlib.Path) -> bool:
     return git_path.is_file()  # worktree links use a .git file
 
 
+def _find_git_root(path: pathlib.Path) -> pathlib.Path | None:
+    """Walk upward from ``path`` looking for a directory that contains
+    ``.git`` (either a directory for a normal repo, or a file for a
+    git worktree link). Returns the discovered root or None.
+
+    REDACTED's layout puts the .xcodeproj inside ``REDACTED/`` but
+    the worktree's ``.git`` file is at ``/private/tmp/REDACTED-develop-Phase A/.git`` —
+    so a fix.py invocation pointing project_root at the .xcodeproj dir
+    must locate the git root one level up.
+    """
+
+    candidate = path
+    for _ in range(8):
+        git_entry = candidate / ".git"
+        if git_entry.is_file() or git_entry.is_dir():
+            return candidate
+        if candidate.parent == candidate:
+            return None
+        candidate = candidate.parent
+    return None
+
+
 def _git_head(path: pathlib.Path) -> str:
     return subprocess.check_output(
         ["git", "-C", str(path), "rev-parse", "HEAD"], text=True
@@ -402,8 +433,12 @@ def _git_head(path: pathlib.Path) -> str:
 def _ensure_branch(project_root: pathlib.Path, branch: str) -> None:
     """Create + check out the throwaway branch from current HEAD.
 
-    If the branch already exists (re-runs), check it out without
-    discarding work. The orchestrator never deletes user data.
+    Verifies the resulting state rather than trusting the git exit
+    code, because some projects' ``post-checkout`` hooks (e.g. REDACTED's
+    GitFlow-name enforcer) exit non-zero with only a warning and we
+    don't want that to crash the orchestrator. If after the checkout
+    HEAD points at the requested branch, the call is treated as a
+    success regardless of git's exit code.
     """
 
     rc = subprocess.call(
@@ -412,12 +447,21 @@ def _ensure_branch(project_root: pathlib.Path, branch: str) -> None:
         stderr=subprocess.DEVNULL,
     )
     if rc == 0:
-        subprocess.check_call(
+        subprocess.call(
             ["git", "-C", str(project_root), "checkout", branch]
         )
     else:
-        subprocess.check_call(
+        subprocess.call(
             ["git", "-C", str(project_root), "checkout", "-b", branch]
+        )
+
+    current = subprocess.check_output(
+        ["git", "-C", str(project_root), "rev-parse", "--abbrev-ref", "HEAD"],
+        text=True,
+    ).strip()
+    if current != branch:
+        raise RuntimeError(
+            f"failed to switch to branch {branch}; HEAD is on {current!r}"
         )
 
 
@@ -490,6 +534,13 @@ def _compute_delta(
         post_summary = (post.get("summary") or {}).get(axis) or {}
         pre_med = pre_summary.get("median_seconds")
         post_med = post_summary.get("median_seconds")
+        # benchmark.py reports count=0 when every run on that axis failed;
+        # in that case the median is 0.0 (default), which would otherwise
+        # compute as a giant fictitious improvement. Treat as null.
+        if (pre_summary.get("count") or 0) == 0:
+            pre_med = None
+        if (post_summary.get("count") or 0) == 0:
+            post_med = None
         delta: float | None
         if isinstance(pre_med, (int, float)) and isinstance(post_med, (int, float)):
             delta = float(post_med) - float(pre_med)

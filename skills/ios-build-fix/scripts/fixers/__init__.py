@@ -71,6 +71,12 @@ class FixContext:
     """Inputs every fixer can read.
 
     The orchestrator constructs this once per fix run.
+
+    ``no_verify_commits`` is forwarded to ``git commit`` as
+    ``--no-verify``. Use only for throwaway test branches in foreign
+    projects whose pre-commit hooks are intended for code-review
+    compliance (e.g. JIRA-ticket name patterns) rather than correctness
+    validation. Never set this for the user's primary working tree.
     """
 
     diagnosis: dict[str, Any]
@@ -78,6 +84,7 @@ class FixContext:
     project_root: pathlib.Path
     branch: str
     auto_approve: bool
+    no_verify_commits: bool = False
 
 
 def to_applied_fix_dict(applied: AppliedFix) -> dict[str, Any]:
