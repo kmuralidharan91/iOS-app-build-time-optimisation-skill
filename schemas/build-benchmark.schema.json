@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kmuralidharan91/iOS-app-build-time-optimisation-skill/schemas/build-benchmark.schema.json",
+  "title": "ios-build-measure benchmark artifact",
+  "description": "JSON shape produced by scripts/benchmark.py per measurement run. Field names and unit suffixes (_seconds, _percent) are independent of any third-party schema; see docs/PLAN.md for clean-room posture.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool",
+    "generated_at",
+    "project",
+    "configuration",
+    "runs",
+    "summary",
+    "critical_path",
+    "history",
+    "notes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"}
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "ISO-8601 UTC timestamp of artifact creation."
+    },
+    "project": {
+      "type": "object",
+      "required": ["path", "build_system", "platform"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string"},
+        "build_system": {"type": "string", "enum": ["xcode", "tuist", "bazel"]},
+        "git_sha": {"type": ["string", "null"]},
+        "git_branch": {"type": ["string", "null"]},
+        "platform": {"type": "string", "enum": ["ios"]}
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "required": [
+        "scheme",
+        "configuration",
+        "destination",
+        "repeats",
+        "build_types",
+        "variance_threshold_percent",
+        "extra_xcodebuild_args"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scheme": {"type": ["string", "null"]},
+        "configuration": {"type": "string"},
+        "destination": {"type": "string"},
+        "repeats": {"type": "integer", "minimum": 1},
+        "build_types": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["clean", "incremental"]},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "variance_threshold_percent": {"type": "number", "minimum": 0},
+        "extra_xcodebuild_args": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "runs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"$ref": "#/$defs/timed_build"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/type_summary"}
+    },
+    "critical_path": {
+      "type": "object",
+      "description": "Per-build-type critical-path attribution.",
+      "additionalProperties": {"$ref": "#/$defs/critical_path"}
+    },
+    "history": {
+      "type": "object",
+      "required": ["regression_detected", "deltas_percent", "window_used", "threshold_percent", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "regression_detected": {"type": "boolean"},
+        "deltas_percent": {
+          "type": "object",
+          "additionalProperties": {"type": "number"}
+        },
+        "window_used": {"type": "integer", "minimum": 0},
+        "threshold_percent": {"type": "number", "minimum": 0},
+        "notes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "timed_build": {
+      "type": "object",
+      "required": [
+        "kind",
+        "duration_seconds",
+        "exit_code",
+        "stdout_log_path",
+        "started_at",
+        "finished_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"type": "string", "enum": ["clean", "incremental"]},
+        "duration_seconds": {"type": "number", "minimum": 0},
+        "exit_code": {"type": "integer"},
+        "stdout_log_path": {"type": "string"},
+        "result_bundle_path": {"type": ["string", "null"]},
+        "started_at": {"type": "string"},
+        "finished_at": {"type": "string"}
+      }
+    },
+    "type_summary": {
+      "type": "object",
+      "required": [
+        "count",
+        "min_seconds",
+        "max_seconds",
+        "median_seconds",
+        "mean_seconds",
+        "spread_seconds",
+        "spread_percent",
+        "high_variance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "min_seconds": {"type": "number", "minimum": 0},
+        "max_seconds": {"type": "number", "minimum": 0},
+        "median_seconds": {"type": "number", "minimum": 0},
+        "mean_seconds": {"type": "number", "minimum": 0},
+        "spread_seconds": {"type": "number", "minimum": 0},
+        "spread_percent": {"type": "number", "minimum": 0},
+        "high_variance": {"type": "boolean"}
+      }
+    },
+    "critical_path": {
+      "type": "object",
+      "required": ["method", "nodes", "longest_chain_seconds", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": ["string", "null"],
+          "enum": ["task-class-aggregate", "xcresult-target-graph", "timing-summary-aggregate", null]
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["target", "duration_seconds", "depth", "dominant_task", "predecessors"],
+            "additionalProperties": false,
+            "properties": {
+              "target": {"type": "string"},
+              "duration_seconds": {"type": "number", "minimum": 0},
+              "depth": {"type": "integer", "minimum": 0},
+              "dominant_task": {"type": "string"},
+              "predecessors": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "longest_chain_seconds": {"type": "number", "minimum": 0},
+        "notes": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}
