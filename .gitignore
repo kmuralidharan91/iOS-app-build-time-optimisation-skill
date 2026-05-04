@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Local artifacts created by skill scripts (kept per-project, not checked in here)
+.build-history/
+.build-benchmark/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Smoke + verification scratch (chat outputs go to docs/smoke/, docs/verification/ — those ARE checked in)
+/tmp-scratch/
