@@ -115,3 +115,42 @@ mention; user reviewer judges whether this is a true F2 hit).
   (no Debug guard) — true F2 hit.
 - `Crashlytics-Run Script` → invokes `firebase-ios-sdk/Crashlytics/run`
   binary directly — borderline; guarded by Phase A simulate review.
+
+**Phase A disposition (user-confirmed via AskUserQuestion 2026-05-04).**
+The `Crashlytics-Run Script` borderline hit is accepted as a real F2
+case rather than a heuristic false positive. Reasoning: Firebase's
+`Crashlytics/run` binary uploads dSYMs on every Debug simulator build
+unless the project gates the phase via `CONFIGURATION`. The keyword
+match arrives via the SourcePackages path
+(`${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run`),
+not a feature mention in the script body, but the underlying anti-pattern
+is identical to the `.sh`-routed cases. No change to
+`scripts/analyzers/script_phase.py::_is_artifact_upload_extended` —
+the existing heuristic correctly surfaces this. Strict FP rate stays
+0/26; loose FP rate (counting this hit) stays 1/26 = 3.8%, well under
+the 20% gate. The Phase A simulate `script-phase/missing-debug-guard`
+predictor's tuning_data_point notes this disposition.
+
+## Phase A simulate prediction tuning data points
+
+Phase A (`ios-build-simulate`) builds a per-rule prediction function on
+top of the Phase A finding-level `wall_clock_predicted_seconds` block.
+Each predictor cites a tuning data point on both clean and incremental
+axes per AGENTS.md non-negotiable principle 5. The tuning points are
+encoded in the predictor source under
+[`scripts/simulators/`](../scripts/simulators/) and reproduced here as
+the human-facing table.
+
+| rule_id | tuning data point (clean) | tuning data point (incremental) |
+| --- | --- | --- |
+| `script-phase/random-sleep` | REDACTED REDACTED `Step7_RunCrashlytics.sh:13` `sleep $[ ( $RANDOM % 10 ) + 1 ]s` → mean 5.5s, range 1–10s | same — sleep runs unconditionally on every build |
+| `script-phase/missing-debug-guard` | REDACTED 4/26 baseline incremental: Step7+Step8 combined ~3s; 1.5s per finding aggregated | same — guard fires regardless of clean/incremental |
+| `script-phase/missing-output-declarations` | REDACTED REDACTED step-22 CSV; per-phase 4s ±1; sum capped at sqrt(N)×4 to model post-sandbox+fuse parallel fan-out | same shape; cap applies symmetrically |
+| `script-phase/swiftlint-on-build` | REDACTED Step1_SwiftLintCheck heuristic: clean ~3s, incremental ~2s (1–6 range) | REDACTED heuristic: ~2s per finding |
+| `build-setting/compilation-cache-disabled` | REDACTED Phase D measurement: 45.6% on warm-cache clean (~125s on 275s baseline); when measurement.json supplies a project baseline, prediction scales accordingly | REDACTED Phase D measured ~10s incremental regression cost (positive value = regression) |
+| `build-setting/eager-linking-disabled` | REDACTED Phase v1→v2 measurement: zero clean improvement; predicted 0s ±8 to surface the low-confidence shape; Phase A fix re-measure must refuse on null delta | 0s ±0 — eager linking affects scheduling, not incremental wall-clock |
+| `build-setting/script-sandboxing-disabled` (PR-#2) | WWDC22 110364: indirect; estimate=null; wins materialise via `FUSE_BUILD_SCRIPT_PHASES` once enabled | same |
+| `build-setting/fuse-build-script-phases-disabled` (PR-#2) | WWDC22 110364: heuristic 0.5s clean / 0.4s incremental per phase × REDACTED 14-phase count → ~7s clean / ~5.6s incremental | same — heuristic, project-shape sensitive |
+| `asset-catalog/incremental-recompile` | F5 is incremental-only — predicted 0s clean (asset catalog always compiles cold) | REDACTED Phase A `measurement.json` `incremental.critical_path.nodes` `CompileAssetCatalogVariant`=4.366s; predictor uses literal node duration when supplied, else falls back to that reference |
+| `spm/swift-syntax-not-prebuilt` | REDACTED Package.resolved swift-syntax 510.0.3 (transitive); Xcode 26 prebuilt mechanism line-level verified by Phase A S6a; predicted -12s ±7s clean | 0s — F6 is a clean-build finding; swift-syntax compiles once |
+| `spm/oversized-module` | REDACTED REDACTED module file counts: REDACTED=794, REDACTED=330; per-file emit ~0.05s clean; 794 × 0.05 ≈ 40s matches Phase A estimate 39.7s | 0s default — incremental cost only materialises on file-level edits inside the module (captured in `applies_when`) |

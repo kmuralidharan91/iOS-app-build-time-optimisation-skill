@@ -116,6 +116,22 @@ phase, F3 finding family) is applied.
 
 Mitigation: enable sandboxing first; sandbox failure mode surfaces undeclared dependencies as build errors instead of silent data races.
 
+## `IDEPackageEnablePrebuilts` (Xcode 26 user-defaults; macro-using projects)
+
+Rule id: `spm/swift-syntax-not-prebuilt` (F6 ground truth).
+
+**Why.** Xcode 26 ships a prebuilt `swift-syntax` library that is downloaded from swift.org and integrated into the build graph for macro-using targets, replacing the per-clean-build source compile of swift-syntax that has historically dominated clean-build cost on projects pulling macros transitively. Apple's Xcode 26 release notes, "Swift Macros Build Performance → New Features", verbatim:
+
+> Build for Swift macro targets is accelerated by downloading a prebuilt library for swift-syntax from swift.org and integrating it into the build. This feature is enabled automatically and will improve build times for these projects.  (151701829)
+
+(Verified line-level by Phase A S6a via the SPA's JSON endpoint `https://developer.apple.com/tutorials/data/documentation/xcode-release-notes/xcode-26-release-notes.json`; HTML page is marketing-shell-only.)
+
+**Recommended.** Use Xcode 26 (or later); leave `IDEPackageEnablePrebuilts` at its automatic-on default. There is **no project-side build setting** to flip — the mechanism is opt-in by virtue of Xcode version, not by xcconfig.
+
+**Measurement.** Estimated 5–20s clean-build savings depending on how many macro-using packages reach `swift-syntax` transitively. REDACTED REDACTED pins `swift-syntax @ 510.0.3` transitively (Package.resolved:382); Phase A simulate predicts -12s ±7s for F6 with `confidence=low` (heuristic; project-shape sensitive).
+
+**Risk.** Apple's Xcode 26 release notes list two known build-failure modes for macro-dependent projects + one Legacy Preview Execution issue, all worked around by disabling the feature via `defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts NO`. Apply that workaround only when build failures around `_SwiftSyntaxCShims` appear; it disables the speedup repo-wide for that user.
+
 ## How analyzers read this file
 
 `scripts/analyzers/build_setting.py` does **not** parse this file at
