@@ -96,6 +96,8 @@ class DoctorContext:
     keep_worktree: bool
     no_verify_commits: bool
     worktree_seed_ref: str
+    reuse_diagnosis_artifact: pathlib.Path | None
+    reuse_simulation_artifact: pathlib.Path | None
     # runtime state
     run_id: str = ""
     started_at: str = ""
@@ -147,6 +149,13 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
              "tuning-data consistency).")
     parser.add_argument("--rule-id", default=None,
         help="Skip the top-N approval prompt and pre-pick this rule.")
+    parser.add_argument("--reuse-diagnosis-artifact", type=pathlib.Path, default=None,
+        help="Skip the diagnose subprocess and use this pre-existing diagnosis.json. "
+             "Caller is responsible for SHA / project-path equivalence (e.g. REDACTED "
+             "smokes pinned at REDACTED reuse docs/smoke/2/diagnosis.json).")
+    parser.add_argument("--reuse-simulation-artifact", type=pathlib.Path, default=None,
+        help="Skip the simulate subprocess and use this pre-existing simulation.json. "
+             "Same SHA-equivalence caveat as --reuse-diagnosis-artifact.")
     parser.add_argument("--non-interactive", action="store_true",
         help="Refuse if any required answer is missing from CLI flags.")
     parser.add_argument("--transcript-path", type=pathlib.Path, default=None,
@@ -227,6 +236,14 @@ def _resolve_questionnaire(args: argparse.Namespace) -> DoctorContext:
         keep_worktree=args.keep_worktree,
         no_verify_commits=args.no_verify_commits,
         worktree_seed_ref=args.worktree_seed_ref,
+        reuse_diagnosis_artifact=(
+            args.reuse_diagnosis_artifact.resolve()
+            if args.reuse_diagnosis_artifact is not None else None
+        ),
+        reuse_simulation_artifact=(
+            args.reuse_simulation_artifact.resolve()
+            if args.reuse_simulation_artifact is not None else None
+        ),
     )
 
 
@@ -948,16 +965,38 @@ def main(argv: list[str] | None = None) -> int:
         return _finish("info:baseline-only")
 
     # ----- Step 4: diagnose ------------------------------------------------
-    rc, diagnosis_path = _run_diagnose(ctx, measurement_path)
-    if rc != 0:
-        notes.append(f"diagnose.py exited rc={rc}")
-        return _finish("abort:diagnose-failed")
+    if ctx.reuse_diagnosis_artifact is not None:
+        diagnosis_path = ctx.reuse_diagnosis_artifact
+        if not diagnosis_path.is_file():
+            notes.append(f"--reuse-diagnosis-artifact path missing: {diagnosis_path}")
+            return _finish("abort:diagnose-failed")
+        notes.append(
+            f"diagnose step skipped; reusing pre-existing artifact "
+            f"{diagnosis_path} (caller asserts SHA-equivalence with --worktree-seed-ref)."
+        )
+        print(f"[doctor.py] diagnose: REUSED {diagnosis_path}")
+    else:
+        rc, diagnosis_path = _run_diagnose(ctx, measurement_path)
+        if rc != 0:
+            notes.append(f"diagnose.py exited rc={rc}")
+            return _finish("abort:diagnose-failed")
 
     # ----- Step 5: simulate ------------------------------------------------
-    rc, simulation_path = _run_simulate(ctx, diagnosis_path, measurement_path)
-    if rc != 0:
-        notes.append(f"simulate.py exited rc={rc}")
-        return _finish("abort:simulate-failed")
+    if ctx.reuse_simulation_artifact is not None:
+        simulation_path = ctx.reuse_simulation_artifact
+        if not simulation_path.is_file():
+            notes.append(f"--reuse-simulation-artifact path missing: {simulation_path}")
+            return _finish("abort:simulate-failed")
+        notes.append(
+            f"simulate step skipped; reusing pre-existing artifact "
+            f"{simulation_path} (caller asserts SHA-equivalence with --worktree-seed-ref)."
+        )
+        print(f"[doctor.py] simulate: REUSED {simulation_path}")
+    else:
+        rc, simulation_path = _run_simulate(ctx, diagnosis_path, measurement_path)
+        if rc != 0:
+            notes.append(f"simulate.py exited rc={rc}")
+            return _finish("abort:simulate-failed")
 
     simulation = _load_json(simulation_path)
     ranked = _rank_predictions(simulation)
