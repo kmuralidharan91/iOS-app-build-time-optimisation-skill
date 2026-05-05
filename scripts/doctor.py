@@ -96,9 +96,6 @@ class DoctorContext:
     keep_worktree: bool
     no_verify_commits: bool
     worktree_seed_ref: str
-    reuse_measurement_artifact: pathlib.Path | None
-    reuse_diagnosis_artifact: pathlib.Path | None
-    reuse_simulation_artifact: pathlib.Path | None
     # runtime state
     run_id: str = ""
     started_at: str = ""
@@ -150,18 +147,6 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
              "tuning-data consistency).")
     parser.add_argument("--rule-id", default=None,
         help="Skip the top-N approval prompt and pre-pick this rule.")
-    parser.add_argument("--reuse-measurement-artifact", type=pathlib.Path, default=None,
-        help="Skip the pre-measure subprocess and use this pre-existing "
-             "measurement.json. Caller is responsible for SHA / project-path "
-             "equivalence. Useful for retrying a failed mid-run smoke without "
-             "redoing the ~25 min benchmark phase.")
-    parser.add_argument("--reuse-diagnosis-artifact", type=pathlib.Path, default=None,
-        help="Skip the diagnose subprocess and use this pre-existing diagnosis.json. "
-             "Caller is responsible for SHA / project-path equivalence (e.g. REDACTED "
-             "smokes pinned at REDACTED reuse docs/smoke/2/diagnosis.json).")
-    parser.add_argument("--reuse-simulation-artifact", type=pathlib.Path, default=None,
-        help="Skip the simulate subprocess and use this pre-existing simulation.json. "
-             "Same SHA-equivalence caveat as --reuse-diagnosis-artifact.")
     parser.add_argument("--non-interactive", action="store_true",
         help="Refuse if any required answer is missing from CLI flags.")
     parser.add_argument("--transcript-path", type=pathlib.Path, default=None,
@@ -242,18 +227,6 @@ def _resolve_questionnaire(args: argparse.Namespace) -> DoctorContext:
         keep_worktree=args.keep_worktree,
         no_verify_commits=args.no_verify_commits,
         worktree_seed_ref=args.worktree_seed_ref,
-        reuse_measurement_artifact=(
-            args.reuse_measurement_artifact.resolve()
-            if args.reuse_measurement_artifact is not None else None
-        ),
-        reuse_diagnosis_artifact=(
-            args.reuse_diagnosis_artifact.resolve()
-            if args.reuse_diagnosis_artifact is not None else None
-        ),
-        reuse_simulation_artifact=(
-            args.reuse_simulation_artifact.resolve()
-            if args.reuse_simulation_artifact is not None else None
-        ),
     )
 
 
@@ -582,6 +555,7 @@ def _run_fix(
     simulation_artifact: pathlib.Path,
     measurement_pre: pathlib.Path,
     worktree: pathlib.Path,
+    touch_file_for_fix: pathlib.Path | None = None,
 ) -> tuple[int, pathlib.Path]:
     out = ctx.output_dir / f"fix-{_slugify_rule(rule_id)}"
     out.mkdir(parents=True, exist_ok=True)
@@ -606,8 +580,12 @@ def _run_fix(
         "--allow-refusal",     # refused-* is honest-PASS for the demo
         "--allow-manual",      # manual rules go through fix.py for tuning data
     ]
-    if "incremental" in ctx.build_types and ctx.touch_file is not None:
-        cmd.extend(["--touch-file", str(ctx.touch_file)])
+    # Forward the worktree-translated touch-file (Phase A D.6) so
+    # fix.py's post-fix benchmark mtime-touches a file inside the
+    # throwaway worktree, not the primary checkout.
+    fix_touch = touch_file_for_fix if touch_file_for_fix is not None else ctx.touch_file
+    if "incremental" in ctx.build_types and fix_touch is not None:
+        cmd.extend(["--touch-file", str(fix_touch)])
     if ctx.no_verify_commits:
         cmd.append("--no-verify-commits")
 
@@ -976,59 +954,26 @@ def main(argv: list[str] | None = None) -> int:
         return _finish("abort:non-xcode-v1-fence")
 
     # ----- Step 3: measure -------------------------------------------------
-    if ctx.reuse_measurement_artifact is not None:
-        measurement_path = ctx.reuse_measurement_artifact
-        if not measurement_path.is_file():
-            notes.append(f"--reuse-measurement-artifact path missing: {measurement_path}")
-            return _finish("abort:measure-failed")
-        notes.append(
-            f"measure step skipped; reusing pre-existing artifact "
-            f"{measurement_path} (caller asserts equivalence with current run)."
-        )
-        print(f"[doctor.py] measure: REUSED {measurement_path}")
-    else:
-        rc, measurement_path = _run_measure(ctx)
-        if rc != 0:
-            notes.append(f"benchmark.py exited rc={rc}")
-            return _finish("abort:measure-failed")
+    rc, measurement_path = _run_measure(ctx)
+    if rc != 0:
+        notes.append(f"benchmark.py exited rc={rc}")
+        return _finish("abort:measure-failed")
 
     if ctx.goal == "baseline":
         notes.append("goal=baseline; stopping after measure (info:baseline-only).")
         return _finish("info:baseline-only")
 
     # ----- Step 4: diagnose ------------------------------------------------
-    if ctx.reuse_diagnosis_artifact is not None:
-        diagnosis_path = ctx.reuse_diagnosis_artifact
-        if not diagnosis_path.is_file():
-            notes.append(f"--reuse-diagnosis-artifact path missing: {diagnosis_path}")
-            return _finish("abort:diagnose-failed")
-        notes.append(
-            f"diagnose step skipped; reusing pre-existing artifact "
-            f"{diagnosis_path} (caller asserts SHA-equivalence with --worktree-seed-ref)."
-        )
-        print(f"[doctor.py] diagnose: REUSED {diagnosis_path}")
-    else:
-        rc, diagnosis_path = _run_diagnose(ctx, measurement_path)
-        if rc != 0:
-            notes.append(f"diagnose.py exited rc={rc}")
-            return _finish("abort:diagnose-failed")
+    rc, diagnosis_path = _run_diagnose(ctx, measurement_path)
+    if rc != 0:
+        notes.append(f"diagnose.py exited rc={rc}")
+        return _finish("abort:diagnose-failed")
 
     # ----- Step 5: simulate ------------------------------------------------
-    if ctx.reuse_simulation_artifact is not None:
-        simulation_path = ctx.reuse_simulation_artifact
-        if not simulation_path.is_file():
-            notes.append(f"--reuse-simulation-artifact path missing: {simulation_path}")
-            return _finish("abort:simulate-failed")
-        notes.append(
-            f"simulate step skipped; reusing pre-existing artifact "
-            f"{simulation_path} (caller asserts SHA-equivalence with --worktree-seed-ref)."
-        )
-        print(f"[doctor.py] simulate: REUSED {simulation_path}")
-    else:
-        rc, simulation_path = _run_simulate(ctx, diagnosis_path, measurement_path)
-        if rc != 0:
-            notes.append(f"simulate.py exited rc={rc}")
-            return _finish("abort:simulate-failed")
+    rc, simulation_path = _run_simulate(ctx, diagnosis_path, measurement_path)
+    if rc != 0:
+        notes.append(f"simulate.py exited rc={rc}")
+        return _finish("abort:simulate-failed")
 
     simulation = _load_json(simulation_path)
     ranked = _rank_predictions(simulation)
@@ -1060,6 +1005,21 @@ def main(argv: list[str] | None = None) -> int:
         rel = pathlib.Path(".")
     worktree_project = (worktree / rel).resolve() if str(rel) not in ("", ".") else worktree
 
+    # Phase A D.6 — translate ctx.touch_file the same way so fix.py's
+    # post-fix mtime touch hits the throwaway worktree's working copy,
+    # not the primary checkout. F4's clean-axis gate is unaffected by
+    # the prior Phase A confound, but the incremental axis was; this
+    # patch makes the incremental measurement well-defined.
+    worktree_touch_file: pathlib.Path | None
+    if ctx.touch_file is not None:
+        try:
+            rel_touch = ctx.touch_file.relative_to(git_root)
+            worktree_touch_file = (worktree / rel_touch).resolve()
+        except ValueError:
+            worktree_touch_file = ctx.touch_file
+    else:
+        worktree_touch_file = None
+
     # ----- Step 9: fix -----------------------------------------------------
     try:
         rc, fix_result_path = _run_fix(
@@ -1069,6 +1029,7 @@ def main(argv: list[str] | None = None) -> int:
             simulation_artifact=simulation_path,
             measurement_pre=measurement_path,
             worktree=worktree_project,
+            touch_file_for_fix=worktree_touch_file,
         )
     finally:
         # Always attempt teardown unless --keep-worktree.
