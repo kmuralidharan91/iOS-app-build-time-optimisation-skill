@@ -6,6 +6,14 @@
 > [`references/defaults.md`](references/defaults.md), and the analyzer
 > source under [`scripts/analyzers/`](scripts/analyzers/).
 
+## Table of contents
+
+- [`findings[]` rules](#findings-rules-counted-toward-the-f1f9-effectiveness-gate) — F1–F9 effectiveness-gate rules
+- [`additional_recommendations[]` rules](#additional_recommendations-rules-pr-2-audit-counted-separately-so-the-f1f9-recall-denominator-stays-unambiguous) — PR-#2 sandboxing + fuse audit
+- [Suppression rules](#suppression-rules-intentionally-do-not-surface) — intentionally do not surface
+- [Coverage boundaries](#coverage-boundaries) — adapter / platform / critical-path scope
+- [Sources of truth](#sources-of-truth) — where the canonical rule data lives
+
 ## `findings[]` rules (counted toward the F1–F9 effectiveness gate)
 
 | Rule id | Family | Inspects | Fires when | Impact | Citation |
