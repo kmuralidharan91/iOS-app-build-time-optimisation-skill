@@ -7,11 +7,9 @@ in Phase A: ``show_build_settings`` invokes
 ``xcodebuild -showBuildSettings -json``; ``script_phases`` parses
 ``project.pbxproj`` plists for ``PBXShellScriptBuildPhase`` entries;
 ``package_graph`` walks ``Package.resolved`` and ``Package.swift``
-manifests. The fix-side method ``apply_fix`` is the v0 contract
-placeholder — Phase A superseded it with the ``scripts/fixers/``
-module design (see ``scripts/fix.py``); the stub is retained for
-the AGENTS.md adapter-contract signature only and is not called by
-any production code.
+manifests. Fix application is **not** an adapter responsibility — see
+``scripts/fixers/registry.py`` (per-rule fixer modules) and
+``scripts/fix.py`` (orchestrator) for the Phase A design.
 
 Wall-clock-only measurement strategy:
 
@@ -592,13 +590,6 @@ def package_graph(
     return PackageGraph(
         pins=tuple(pins),
         local_modules=tuple(local_modules),
-    )
-
-
-def apply_fix(project_path, finding_id, patch, branch_name, platform="ios"):
-    """Stub for Phase A: applies an approved patch on a fresh git branch."""
-    raise NotImplementedError(
-        "apply_fix ships in Phase A (ios-build-fix)."
     )
 
 

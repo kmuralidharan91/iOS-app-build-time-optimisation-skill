@@ -55,9 +55,5 @@ def package_graph(*args, **kwargs):
     raise NotImplementedError("Bazel diagnose ships in Phase A or later.")
 
 
-def apply_fix(*args, **kwargs):
-    raise NotImplementedError("Bazel fix ships in Phase A or later.")
-
-
 def adapter_label() -> str:
     return "bazel"

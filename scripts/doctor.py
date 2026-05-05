@@ -61,7 +61,7 @@ DEFAULT_BUILD_TYPES = "clean,incremental"
 DEFAULT_REPEATS = 3
 DEFAULT_DESTINATION = "generic/platform=iOS Simulator"
 DEFAULT_CONFIGURATION = "Debug"
-DEFAULT_BRANCH_PREFIX = "gh-skill-test"
+DEFAULT_BRANCH_PREFIX = "chore"
 DEFAULT_WORKTREE_BASE = "/tmp"
 
 

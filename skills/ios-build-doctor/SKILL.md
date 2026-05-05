@@ -31,7 +31,7 @@ If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure
 | `--output-dir DIR` | yes | — | Run-rooted; e.g. `docs/smoke/5/run-001/`. |
 | `--top-n N` | no | `3` | How many ranked predictions are surfaced for approval. |
 | `--worktree-base DIR` | no | `/tmp` | Parent of the throwaway worktree (`/tmp/REDACTED-doctor-<UTC-ts>/`). |
-| `--branch-prefix PREFIX` | no | `gh-skill-test` | Forwarded to fix.py. |
+| `--branch-prefix PREFIX` | no | `chore` | Forwarded to fix.py. Default matches the conventional-commits / GitFlow folder vocabulary that most repo `prepare-commit-msg` hooks accept (`feature\|bug\|release\|hotfix\|spike\|chore\|build\|ci\|docs\|test`). Override per-call if your repo enforces a stricter regex (e.g. requires a Jira ticket prefix). |
 | `--variance-threshold-pct N` | no | `10.0` | Forwarded to measure + fix. |
 | `--auto-approve-fix` | no | off | Forwarded as `--auto-approve` to fix.py. Doctor's own pick gate is unaffected. |
 | `--allow-manual` | no | off | Always forwarded to fix.py — manual rules (F5/F6/F7) emit `refused-null` fix-result for tuning data instead of being short-circuited. |

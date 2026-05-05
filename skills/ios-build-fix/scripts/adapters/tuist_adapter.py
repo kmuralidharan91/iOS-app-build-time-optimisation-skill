@@ -44,9 +44,5 @@ def package_graph(*args, **kwargs):
     raise NotImplementedError("Tuist diagnose ships in Phase A or later.")
 
 
-def apply_fix(*args, **kwargs):
-    raise NotImplementedError("Tuist fix ships in Phase A or later.")
-
-
 def adapter_label() -> str:
     return "tuist"
