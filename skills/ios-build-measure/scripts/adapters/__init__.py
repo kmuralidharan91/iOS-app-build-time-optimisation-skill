@@ -71,6 +71,72 @@ class CriticalPath:
     notes: list[str]
 
 
+@dataclasses.dataclass(frozen=True)
+class ScriptPhase:
+    """One ``PBXShellScriptBuildPhase`` extracted from a project.pbxproj.
+
+    Attribute names match those the analyzers in
+    ``scripts/analyzers/script_phase.py`` already read (``phase.target``,
+    ``phase.name``, ``phase.script``, ``phase.input_paths``,
+    ``phase.output_paths``, ``phase.always_out_of_date``).
+    """
+
+    target: str
+    name: str
+    script: str
+    input_paths: tuple[str, ...]
+    output_paths: tuple[str, ...]
+    always_out_of_date: bool
+    pbxproj_path: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class Pin:
+    """One entry from a Package.resolved file.
+
+    ``name`` corresponds to Package.resolved's ``identity`` field (the
+    canonical SPM identity). ``source_resolved_path`` is the absolute
+    path of the Package.resolved file the pin was read from; the
+    analyzer surfaces it as the evidence path.
+    """
+
+    name: str
+    version: str | None
+    revision: str | None
+    branch: str | None
+    location: str
+    source_resolved_path: str
+
+
+@dataclasses.dataclass(frozen=True)
+class LocalModule:
+    """One local SPM module discovered under the project tree.
+
+    ``source_count`` is the count of ``*.swift`` files under the
+    module's source roots (typically ``Sources/<target>/``); the
+    oversized-module rule fires when it crosses the threshold in
+    ``references/defaults.md``.
+    """
+
+    name: str
+    path: str
+    source_count: int
+
+
+@dataclasses.dataclass(frozen=True)
+class PackageGraph:
+    """Aggregate SPM state read from a project tree.
+
+    ``pins`` is the union of every pin in every reachable
+    Package.resolved (workspace-level + per-package), de-duplicated by
+    ``(name, source_resolved_path)``. ``local_modules`` is the list
+    of local Package.swift modules with their swift-file counts.
+    """
+
+    pins: tuple[Pin, ...]
+    local_modules: tuple[LocalModule, ...]
+
+
 def detect_build_system(project_path: pathlib.Path) -> KnownBuildSystem:
     """Detect which build system drives the project at ``project_path``.
 
