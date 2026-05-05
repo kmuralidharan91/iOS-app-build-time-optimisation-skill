@@ -96,6 +96,7 @@ class DoctorContext:
     keep_worktree: bool
     no_verify_commits: bool
     worktree_seed_ref: str
+    reuse_measurement_artifact: pathlib.Path | None
     reuse_diagnosis_artifact: pathlib.Path | None
     reuse_simulation_artifact: pathlib.Path | None
     # runtime state
@@ -149,6 +150,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
              "tuning-data consistency).")
     parser.add_argument("--rule-id", default=None,
         help="Skip the top-N approval prompt and pre-pick this rule.")
+    parser.add_argument("--reuse-measurement-artifact", type=pathlib.Path, default=None,
+        help="Skip the pre-measure subprocess and use this pre-existing "
+             "measurement.json. Caller is responsible for SHA / project-path "
+             "equivalence. Useful for retrying a failed mid-run smoke without "
+             "redoing the ~25 min benchmark phase.")
     parser.add_argument("--reuse-diagnosis-artifact", type=pathlib.Path, default=None,
         help="Skip the diagnose subprocess and use this pre-existing diagnosis.json. "
              "Caller is responsible for SHA / project-path equivalence (e.g. REDACTED "
@@ -236,6 +242,10 @@ def _resolve_questionnaire(args: argparse.Namespace) -> DoctorContext:
         keep_worktree=args.keep_worktree,
         no_verify_commits=args.no_verify_commits,
         worktree_seed_ref=args.worktree_seed_ref,
+        reuse_measurement_artifact=(
+            args.reuse_measurement_artifact.resolve()
+            if args.reuse_measurement_artifact is not None else None
+        ),
         reuse_diagnosis_artifact=(
             args.reuse_diagnosis_artifact.resolve()
             if args.reuse_diagnosis_artifact is not None else None
@@ -496,8 +506,19 @@ def _setup_worktree(
         "git", "-C", str(git_root),
         "worktree", "add", "--detach", str(target), branch_seed,
     ])
+    # Mirror Phase A fix.py._ensure_branch: foreign post-checkout hooks (e.g.
+    # REDACTED's Swift-macro-trust + GitFlow-name checks) can return non-zero
+    # while the worktree itself is fully created. Verify by post-condition
+    # rather than trusting git's exit code.
     if rc != 0:
-        raise RuntimeError(f"git worktree add failed (rc={rc}); see logs above")
+        if not (target.exists() and (target / ".git").exists()):
+            raise RuntimeError(f"git worktree add failed (rc={rc}); see logs above")
+        print(
+            f"[doctor.py] note: git worktree add returned rc={rc} but worktree "
+            f"directory + .git pointer exist at {target}; treating as success "
+            f"(foreign post-checkout hook).",
+            file=sys.stderr,
+        )
 
     # Best-effort submodule init for projects like REDACTED.
     submodule_rc = subprocess.call(
@@ -955,10 +976,21 @@ def main(argv: list[str] | None = None) -> int:
         return _finish("abort:non-xcode-v1-fence")
 
     # ----- Step 3: measure -------------------------------------------------
-    rc, measurement_path = _run_measure(ctx)
-    if rc != 0:
-        notes.append(f"benchmark.py exited rc={rc}")
-        return _finish("abort:measure-failed")
+    if ctx.reuse_measurement_artifact is not None:
+        measurement_path = ctx.reuse_measurement_artifact
+        if not measurement_path.is_file():
+            notes.append(f"--reuse-measurement-artifact path missing: {measurement_path}")
+            return _finish("abort:measure-failed")
+        notes.append(
+            f"measure step skipped; reusing pre-existing artifact "
+            f"{measurement_path} (caller asserts equivalence with current run)."
+        )
+        print(f"[doctor.py] measure: REUSED {measurement_path}")
+    else:
+        rc, measurement_path = _run_measure(ctx)
+        if rc != 0:
+            notes.append(f"benchmark.py exited rc={rc}")
+            return _finish("abort:measure-failed")
 
     if ctx.goal == "baseline":
         notes.append("goal=baseline; stopping after measure (info:baseline-only).")

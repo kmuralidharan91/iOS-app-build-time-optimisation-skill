@@ -36,6 +36,7 @@ If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure
 | `--auto-approve-fix` | no | off | Forwarded as `--auto-approve` to fix.py. Doctor's own pick gate is unaffected. |
 | `--allow-manual` | no | off | Always forwarded to fix.py — manual rules (F5/F6/F7) emit `refused-null` fix-result for tuning data instead of being short-circuited. |
 | `--rule-id RULE` | no | — | Skip the top-N approval prompt; pre-pick this rule. Used by smoke runs. |
+| `--reuse-measurement-artifact PATH` | no | — | Skip the pre-measure subprocess and reuse a pre-existing `measurement.json`. Useful for retrying a failed mid-run smoke without redoing the ~25-min benchmark phase. Caller asserts SHA / project-path equivalence. |
 | `--reuse-diagnosis-artifact PATH` | no | — | Skip the diagnose subprocess and reuse a pre-existing `diagnosis.json`. Caller asserts SHA-equivalence with `--worktree-seed-ref` (e.g. REDACTED smokes pinned at `REDACTED` reuse `docs/smoke/2/diagnosis.json`). Workaround for the Phase A `xcode_adapter` stub gap; proper backfill is Phase A polish scope. |
 | `--reuse-simulation-artifact PATH` | no | — | Skip the simulate subprocess and reuse a pre-existing `simulation.json`. Same SHA-equivalence caveat. |
 | `--non-interactive` | no | off | Refuse to prompt; require `--rule-id`. |
