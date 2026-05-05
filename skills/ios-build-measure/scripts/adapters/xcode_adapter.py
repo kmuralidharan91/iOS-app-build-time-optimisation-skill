@@ -1,8 +1,17 @@
-"""Xcode adapter — measurement parts for ios-build-measure (Phase A).
+"""Xcode adapter — measurement + diagnose surface for the build skills.
 
-The diagnose-side methods (show_build_settings, script_phases,
-package_graph) and the fix-side method (apply_fix) raise
-NotImplementedError until chats 2 and 4 fill them in.
+The measurement parts (``measure``, ``time_one_build``, ``run_clean``)
+ship in Phase A for ``ios-build-measure``. The diagnose-side methods
+(``show_build_settings``, ``script_phases``, ``package_graph``) ship
+in Phase A: ``show_build_settings`` invokes
+``xcodebuild -showBuildSettings -json``; ``script_phases`` parses
+``project.pbxproj`` plists for ``PBXShellScriptBuildPhase`` entries;
+``package_graph`` walks ``Package.resolved`` and ``Package.swift``
+manifests. The fix-side method ``apply_fix`` is the v0 contract
+placeholder — Phase A superseded it with the ``scripts/fixers/``
+module design (see ``scripts/fix.py``); the stub is retained for
+the AGENTS.md adapter-contract signature only and is not called by
+any production code.
 
 Wall-clock-only measurement strategy:
 
