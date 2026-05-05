@@ -95,6 +95,7 @@ class DoctorContext:
     transcript_path: pathlib.Path
     keep_worktree: bool
     no_verify_commits: bool
+    worktree_seed_ref: str
     # runtime state
     run_id: str = ""
     started_at: str = ""
@@ -152,6 +153,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Override transcript path (default: <output-dir>/swiftcraft-loop.md).")
     parser.add_argument("--keep-worktree", action="store_true",
         help="Skip 'git worktree remove' for post-mortem inspection.")
+    parser.add_argument("--worktree-seed-ref", default="develop",
+        help="git ref to seed the throwaway worktree from (default: 'develop'). "
+             "Use 'origin/develop' on hosts whose local develop branch is stale "
+             "vs. the upstream pin (e.g. REDACTED Phase A/1/2/3/4 ground truth at "
+             "origin/develop=REDACTED).")
     parser.add_argument("--no-verify-commits", action="store_true",
         help="Forwarded to fix.py for projects whose hooks gate on branch-name "
              "or ticket-name patterns rather than correctness.")
@@ -220,6 +226,7 @@ def _resolve_questionnaire(args: argparse.Namespace) -> DoctorContext:
         transcript_path=transcript_path,
         keep_worktree=args.keep_worktree,
         no_verify_commits=args.no_verify_commits,
+        worktree_seed_ref=args.worktree_seed_ref,
     )
 
 
@@ -859,6 +866,7 @@ def _write_run_metadata(
             "keep_worktree": ctx.keep_worktree,
             "no_verify_commits": ctx.no_verify_commits,
             "goal": ctx.goal,
+            "worktree_seed_ref": ctx.worktree_seed_ref,
         },
         **extras,
     }
@@ -964,10 +972,22 @@ def main(argv: list[str] | None = None) -> int:
     # ----- Step 8: worktree ------------------------------------------------
     git_root = _fix_module._find_git_root(ctx.project_path) or ctx.project_path
     try:
-        worktree = _setup_worktree(ctx, git_root)
+        worktree = _setup_worktree(ctx, git_root, branch_seed=ctx.worktree_seed_ref)
     except Exception as exc:  # noqa: BLE001
         notes.append(f"worktree setup failed: {exc}")
         return _finish("abort:worktree-failed")
+
+    # Translate the user's --project-path (relative to git_root) into the
+    # equivalent path inside the throwaway worktree so fix.py's
+    # --project-root points at the *.xcodeproj directory, not the worktree
+    # root. For REDACTED, project_path = ~/REDACTED/REDACTED,
+    # git_root = ~/REDACTED, rel = REDACTED,
+    # worktree = /tmp/REDACTED-doctor-<ts>, worktree_project = /tmp/.../REDACTED.
+    try:
+        rel = ctx.project_path.relative_to(git_root)
+    except ValueError:
+        rel = pathlib.Path(".")
+    worktree_project = (worktree / rel).resolve() if str(rel) not in ("", ".") else worktree
 
     # ----- Step 9: fix -----------------------------------------------------
     try:
@@ -977,7 +997,7 @@ def main(argv: list[str] | None = None) -> int:
             diagnosis_artifact=diagnosis_path,
             simulation_artifact=simulation_path,
             measurement_pre=measurement_path,
-            worktree=worktree,
+            worktree=worktree_project,
         )
     finally:
         # Always attempt teardown unless --keep-worktree.
