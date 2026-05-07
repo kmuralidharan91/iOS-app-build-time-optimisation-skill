@@ -151,7 +151,7 @@
     "variance_threshold_percent": {
       "type": "number",
       "minimum": 0,
-      "description": "Percent-of-baseline floor below which |delta| is classified as noise. Default 10.0 — matches Phase A measure-gate spec and Phase A clean-build observed spread (11.21% at repeats=5)."
+      "description": "Percent-of-baseline floor below which |delta| is classified as noise. Default 10.0 — matches the measure-gate spec and a representative clean-build observed spread (~11% at repeats=5)."
     },
     "outcome": {
       "type": "string",
@@ -173,7 +173,7 @@
     "tuning_data_point": {
       "type": "string",
       "minLength": 1,
-      "description": "Required (mirror simulate schema): project + run + observed delta to feed back into the next iteration of the simulate predictor. E.g. 'REDACTED REDACTED + gh-skill-test/Phase A-F1: F1 random-sleep removed -> incremental Δ -5.7s on 51.8s baseline (predicted -5.5s, within ±50%)'."
+      "description": "Required (mirror simulate schema): project + run + observed delta to feed back into the next iteration of the simulate predictor. E.g. 'F1 random-sleep removed -> incremental Δ -5.7s on 51.8s baseline (predicted -5.5s, within ±50%)'."
     },
     "notes": {
       "type": "array",
@@ -208,7 +208,7 @@
         "within_predicted_band"
       ],
       "additionalProperties": false,
-      "description": "Per-axis (clean or incremental) actual-vs-baseline delta. delta_seconds = post_median - baseline_median (negative = improvement). exceeds_variance true iff |delta_seconds| > variance_threshold_percent * max(baseline_median, post_median) / 100. within_predicted_band true iff |delta - predicted| <= 0.5 * |predicted| (the Phase A ±50% rule from PLAN.md Verification §Simulate gate); null when predicted is null.",
+      "description": "Per-axis (clean or incremental) actual-vs-baseline delta. delta_seconds = post_median - baseline_median (negative = improvement). exceeds_variance true iff |delta_seconds| > variance_threshold_percent * max(baseline_median, post_median) / 100. within_predicted_band true iff |delta - predicted| <= 0.5 * |predicted| (the simulate ±50% rule from PLAN.md Verification §Simulate gate); null when predicted is null.",
       "properties": {
         "delta_seconds": { "type": ["number", "null"] },
         "baseline_median_seconds": { "type": ["number", "null"] },

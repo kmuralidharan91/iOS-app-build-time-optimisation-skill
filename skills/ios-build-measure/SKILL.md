@@ -24,7 +24,7 @@ If the user is asking *why* the build is slow, prefer `ios-build-diagnose`. If t
 | --- | --- | --- | --- |
 | `--project-path PATH` | no | `cwd` | Project root. Build system auto-detected. |
 | `--scheme NAME` | Xcode/Tuist | — | Required for Xcode and Tuist. |
-| `--configuration NAME` | no | `Debug` | Free string. REDACTED uses `Distribution` for release-equivalent. |
+| `--configuration NAME` | no | `Debug` | Free string. Some projects use `Distribution` for release-equivalent. |
 | `--destination STR` | no | `generic/platform=iOS Simulator` | Forwarded to `xcodebuild -destination`. |
 | `--platform STR` | no | `ios` | v1 enforces `ios`; v2 adds macOS / watchOS / tvOS / visionOS. |
 | `--repeats N` | no | `3` | Repeats per build type. ≥5 recommended when variance is high. |
@@ -40,7 +40,7 @@ If the user is asking *why* the build is slow, prefer `ios-build-diagnose`. If t
 1. **Detect** the build system at `--project-path`. The detector looks for `Project.swift` (Tuist) → `MODULE.bazel` / `WORKSPACE` plus `BUILD` files (Bazel) → `*.xcodeproj` / `*.xcworkspace` (Xcode), with tie-breaker order Tuist > Bazel > Xcode (per `AGENTS.md`).
 2. **Run** `--repeats` builds per requested kind. Clean runs invoke `xcodebuild clean` then `xcodebuild build -showBuildTimingSummary -resultBundlePath …`. Incremental runs `touch` `--touch-file` then build without cleaning. Each run is wall-clock-timed with `time.monotonic`.
 3. **Aggregate** per-build-type summaries: `min_seconds`, `max_seconds`, `median_seconds`, `mean_seconds`, `spread_seconds`, `spread_percent`. `high_variance` fires when `spread_percent` exceeds `--variance-threshold` and `count ≥ 2`.
-4. **Derive** `critical_path` per build type from the most recent run's stdout log (preferred) or `.xcresult` bundle (fallback). Phase A ships the task-class-aggregate method; per-target DAG attribution lands in Phase A.
+4. **Derive** `critical_path` per build type from the most recent run's stdout log (preferred) or `.xcresult` bundle (fallback). v1 ships the task-class-aggregate method; per-target DAG attribution is its own deferred workstream.
 5. **Compare** against `<project>/.build-history/runs/` for the same branch; flag regression when current median exceeds historical median-of-medians by more than `--variance-threshold` percent on any build type.
 6. **Persist** the artifact to `--output-dir/measurement.json` AND to `<project>/.build-history/runs/<timestamp>__sha-<sha>__<scheme>-<config>.json`.
 

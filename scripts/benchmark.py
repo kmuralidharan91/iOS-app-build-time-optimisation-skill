@@ -76,7 +76,7 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--configuration", default="Debug",
         help='Build configuration name (default: "Debug"). Free string — '
-             'REDACTED uses "Distribution" for release-equivalent.',
+             'projects sometimes use "Distribution" for release-equivalent.',
     )
     parser.add_argument(
         "--destination",

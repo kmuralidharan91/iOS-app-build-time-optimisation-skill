@@ -1,6 +1,6 @@
 ---
 name: ios-build-simulate
-description: Predict Δ wall-clock per diagnose rule (clean and incremental separately) before applying any fix. Reads a Phase A diagnosis.json (and optionally a Phase A measurement.json for project-context-aware scaling), aggregates findings sharing a rule_id into one prediction, and emits a JSON artifact with a tuning_data_point on every Prediction (the project + run that motivated the predicted Δ). Use when the user asks "what will I save if I fix X?", wants to compare candidate fixes by predicted impact, or needs to surface a trade-off (e.g. F4 saves clean but costs incremental). Recommend-first; this skill never edits source files and never invokes xcodebuild. Output is always labelled "predicted Δ", never "measured".
+description: Predict Δ wall-clock per diagnose rule (clean and incremental separately) before applying any fix. Reads a diagnosis.json (and optionally a measurement.json for project-context-aware scaling), aggregates findings sharing a rule_id into one prediction, and emits a JSON artifact with a tuning_data_point on every Prediction (the project + run that motivated the predicted Δ). Use when the user asks "what will I save if I fix X?", wants to compare candidate fixes by predicted impact, or needs to surface a trade-off (e.g. F4 saves clean but costs incremental). Recommend-first; this skill never edits source files and never invokes xcodebuild. Output is always labelled "predicted Δ", never "measured".
 ---
 
 # `ios-build-simulate`
@@ -16,21 +16,21 @@ Reach for this skill when the user wants the **what-if** answer, not the audit a
 - "What's the trade-off — does this regress incrementals?"
 - "Predict before I apply; I want to know whether it's worth it."
 
-If the user wants the audit (the *why* answer), use [`ios-build-diagnose`](../ios-build-diagnose/SKILL.md). If they want a fix applied + verified, use `ios-build-fix` (Phase A). The orchestrator `ios-build-doctor` chains all three; this skill is the predict step.
+If the user wants the audit (the *why* answer), use [`ios-build-diagnose`](../ios-build-diagnose/SKILL.md). If they want a fix applied + verified, use `ios-build-fix`. The orchestrator `ios-build-doctor` chains all three; this skill is the predict step.
 
 ## Inputs
 
 | Argument | Required | Default | Notes |
 | --- | --- | --- | --- |
-| `--diagnosis-artifact PATH` | yes | — | Path to a Phase A `diagnosis.json` (`ios-build-diagnose` output). |
-| `--measurement-artifact PATH` | no | — | Optional path to a Phase A `measurement.json` (`ios-build-measure` output). Predictors that consume a baseline (F4 compilation-cache, F5 asset-catalog, F7 oversized-module) use it when supplied; otherwise they fall back to REDACTED reference data with reduced confidence. |
+| `--diagnosis-artifact PATH` | yes | — | Path to a `diagnosis.json` (`ios-build-diagnose` output). |
+| `--measurement-artifact PATH` | no | — | Optional path to a `measurement.json` (`ios-build-measure` output). Predictors that consume a baseline (F4 compilation-cache, F5 asset-catalog, F7 oversized-module) use it when supplied; otherwise they fall back to private-corpus reference data with reduced confidence. |
 | `--output-dir DIR` | yes | — | Where `simulation.json` is written. |
-| `--f6-verified` | no | `false` | Set when Phase A S6a has confirmed the Xcode 26 prebuilt-swift-syntax mechanism at line level. Affects the F6 prediction's `tuning_data_point` text but NOT the numeric prediction. The S6a verification log lives in [`docs/verification/3.md`](../../docs/verification/3.md). |
+| `--f6-verified` | no | `false` | Set when the deferred verify has confirmed the Xcode 26 prebuilt-swift-syntax mechanism at line level. Affects the F6 prediction's `tuning_data_point` text but NOT the numeric prediction. |
 
 ## Workflow
 
 1. **Load** the diagnosis artifact (required) and the measurement artifact (optional). Schema-validate the diagnosis input shape opportunistically (the artifact ships with `schema_version`).
-2. **Build context** — `SimulationContext{diagnosis, measurement, project_path, baseline_clean_seconds, baseline_incremental_seconds}`. Baselines come from `runs.clean.median_seconds` / `runs.incremental.median_seconds` of the Phase A schema.
+2. **Build context** — `SimulationContext{diagnosis, measurement, project_path, baseline_clean_seconds, baseline_incremental_seconds}`. Baselines come from `runs.clean.median_seconds` / `runs.incremental.median_seconds` of the benchmark schema.
 3. **Bucket findings by rule_id** — concatenate `findings[]` and `additional_recommendations[]`; each bucket holds tuples of `(original_index, finding_dict)`. Indices from `additional_recommendations[]` are emitted as negative numbers (`-1 - rec_index`) so artifact consumers can route back to the source.
 4. **Dispatch** — for each rule_id with at least one finding, call the registered predictor under `scripts/simulators/` (registry mapping in `scripts/simulators/registry.py::build_registry()`). A finding whose rule_id has no predictor produces a `predict_unknown` placeholder so the artifact stays complete.
 5. **Aggregate** — each predictor consumes ALL findings sharing its rule_id and returns ONE `RulePrediction`. Aggregation strategy is rule-specific (sum for sleep + debug-guard; sqrt-cap for missing-output-declarations; per-file scaling for oversized-module; literal node duration for asset-catalog).
@@ -58,16 +58,16 @@ Top-level fields:
 - `summary` — totals + top-3 lists.
 - `notes[]` — top-level run notes (missing measurement, unverified F6, predictor gaps).
 
-Each `Prediction` carries `method` ∈ {`measured-on-REDACTED`, `measured-on-wikipedia`, `heuristic`, `literature`}, `estimate_seconds`, `min_seconds`, `max_seconds`, and the **required** `tuning_data_point` string naming the project + run that motivated the prediction.
+Each `Prediction` carries `method` ∈ {`measured-on-private-corpus`, `measured-on-wikipedia`, `heuristic`, `literature`}, `estimate_seconds`, `min_seconds`, `max_seconds`, and the **required** `tuning_data_point` string naming the project + run that motivated the prediction.
 
 ## Failure modes (what this skill refuses to do)
 
-- **No project mutation.** This skill never edits source files, project.pbxproj, build settings, or Package.resolved. The fix step lives in `ios-build-fix` (Phase A).
+- **No project mutation.** This skill never edits source files, project.pbxproj, build settings, or Package.resolved. The fix step lives in `ios-build-fix`.
 - **No xcodebuild invocation.** This skill is purely an offline transform: diagnosis.json + measurement.json → simulation.json. No build commands run.
 - **Predicted, never measured.** Every numeric in the output is labelled `wall_clock_predicted_seconds.method`. The user-facing summary always says "predicted Δ", never "Δ".
-- **No silent predictor gaps.** When a diagnosis rule_id has no registered predictor, the orchestrator emits a placeholder `RulePrediction` with `method=heuristic`, `estimate=None`, and a `notes[]` entry calling out the gap. Phase A fix can decline to act on these.
+- **No silent predictor gaps.** When a diagnosis rule_id has no registered predictor, the orchestrator emits a placeholder `RulePrediction` with `method=heuristic`, `estimate=None`, and a `notes[]` entry calling out the gap. The fix step can decline to act on these.
 - **No platform fudge.** `--platform` outside `ios` is rejected by upstream skills (diagnose, measure); the simulate skill inherits the diagnosis's platform field as-is and does not re-validate.
-- **No per-target DAG inference.** The Phase A critical-path method is `task-class-aggregate`; per-target DAG attribution is deferred to a v1.x workstream. Predictions consult `references/defaults.md` reference data, NOT the critical-path nodes (except F5, which reads the literal `CompileAssetCatalogVariant` duration).
+- **No per-target DAG inference.** The benchmark critical-path method is `task-class-aggregate`; per-target DAG attribution is deferred to a v1.x workstream. Predictions consult `references/defaults.md` reference data, NOT the critical-path nodes (except F5, which reads the literal `CompileAssetCatalogVariant` duration).
 
 ## Prediction methodology
 
@@ -75,9 +75,9 @@ Each rule's predictor lives under [`scripts/simulators/`](../../scripts/simulato
 
 1. The function signature is `predict(findings, ctx) -> RulePrediction` where `findings` is the slice of `(original_index, finding_dict)` tuples sharing the rule_id and `ctx` is the `SimulationContext`.
 2. Aggregation is rule-specific: random-sleep sums, missing-debug-guard sums, missing-output-declarations applies a `sqrt(N) × per_phase` cap to model post-sandbox+fuse parallel fan-out, asset-catalog reads the literal critical-path node, oversized-module scales by source-count.
-3. **Every Prediction carries a `tuning_data_point`** naming the project + run that motivated the numeric per AGENTS.md non-negotiable principle 5. Phase A hard-fails the run if any prediction lands without one (the schema's `minLength: 1` enforcement).
-4. F4's `clean.estimate_seconds = -0.456 × baseline_clean_seconds`. With `--measurement-artifact`, baseline = `runs.clean.median_seconds`. Without, baseline falls back to the REDACTED 4/26 reference 275s → -125s.
-5. F6 (`spm/swift-syntax-not-prebuilt`) is gated by `--f6-verified`. The Xcode 26 prebuilt-swift-syntax mechanism was line-level verified in Phase A S6a (see [`references/sources.md`](../../references/sources.md) and the verbatim block-quote in [`references/build-settings-best-practices.md`](../../references/build-settings-best-practices.md)).
+3. **Every Prediction carries a `tuning_data_point`** naming the project + run that motivated the numeric per AGENTS.md non-negotiable principle 5. Simulate hard-fails the run if any prediction lands without one (the schema's `minLength: 1` enforcement).
+4. F4's `clean.estimate_seconds = -0.456 × baseline_clean_seconds`. With `--measurement-artifact`, baseline = `runs.clean.median_seconds`. Without, baseline falls back to a private-corpus reference of 275s → -125s. TODO(public-cite: NetNewsWire) confirm magnitude.
+5. F6 (`spm/swift-syntax-not-prebuilt`) is gated by `--f6-verified`. The Xcode 26 prebuilt-swift-syntax mechanism is line-level verifiable against the SPA's JSON release-notes endpoint (see [`references/sources.md`](../../references/sources.md) and the verbatim block-quote in [`references/build-settings-best-practices.md`](../../references/build-settings-best-practices.md)).
 
 ## References
 
@@ -90,5 +90,5 @@ Each rule's predictor lives under [`scripts/simulators/`](../../scripts/simulato
 
 - [`references/sources.md`](../../references/sources.md) — every URL with verification date.
 - [`references/build-settings-best-practices.md`](../../references/build-settings-best-practices.md) — Why / Recommended / Measurement / Risk for COMPILATION_CACHE_ENABLE_CACHING, EAGER_LINKING, ENABLE_USER_SCRIPT_SANDBOXING, FUSE_BUILD_SCRIPT_PHASES, IDEPackageEnablePrebuilts.
-- [`references/defaults.md`](../../references/defaults.md) — every analyzer threshold + Phase A simulate's per-rule prediction-function tuning data points (project + run that motivated each Δ).
+- [`references/defaults.md`](../../references/defaults.md) — every analyzer threshold + simulate's per-rule prediction-function tuning data points (project + run that motivated each Δ).
 - [`references/critical-path-method.md`](../../references/critical-path-method.md) — v1 task-class-aggregate is the formal contract; per-target DAG attribution stays deferred.

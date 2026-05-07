@@ -13,7 +13,7 @@ Reach for this skill when the user wants the **full loop** answer:
 
 - "Run the doctor on this project."
 - "Give me one transcript that shows everything — measure, find, fix, re-measure."
-- "I want the SwiftCraft-style demo on REDACTED develop."
+- "I want the SwiftCraft-style demo against this checkout."
 
 If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure/SKILL.md). For just the audit, use [`ios-build-diagnose`](../ios-build-diagnose/SKILL.md). For predicted Δ, use [`ios-build-simulate`](../ios-build-simulate/SKILL.md). For one approved fix end-to-end (no questionnaire / no top-N), use [`ios-build-fix`](../ios-build-fix/SKILL.md).
 
@@ -30,7 +30,7 @@ If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure
 | `--repeats N` | no | `3` | Forwarded. |
 | `--output-dir DIR` | yes | — | Run-rooted; e.g. `docs/smoke/5/run-001/`. |
 | `--top-n N` | no | `3` | How many ranked predictions are surfaced for approval. |
-| `--worktree-base DIR` | no | `/tmp` | Parent of the throwaway worktree (`/tmp/REDACTED-doctor-<UTC-ts>/`). |
+| `--worktree-base DIR` | no | `/tmp` | Parent of the throwaway worktree (`/tmp/ios-build-doctor-<UTC-ts>/`). |
 | `--branch-prefix PREFIX` | no | `chore` | Forwarded to fix.py. Default matches the conventional-commits / GitFlow folder vocabulary that most repo `prepare-commit-msg` hooks accept (`feature\|bug\|release\|hotfix\|spike\|chore\|build\|ci\|docs\|test`). Override per-call if your repo enforces a stricter regex (e.g. requires a Jira ticket prefix). |
 | `--variance-threshold-pct N` | no | `10.0` | Forwarded to measure + fix. |
 | `--auto-approve-fix` | no | off | Forwarded as `--auto-approve` to fix.py. Doctor's own pick gate is unaffected. |
@@ -52,7 +52,7 @@ If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure
 6. **Simulate**. Subprocess `scripts/simulate.py` into `<output-dir>/simulation/`. Non-zero → `abort:simulate-failed`.
 7. **Rank predictions**. Auto-applicable rules first (per `scripts/fixers/registry.py::build_registry()`), then by `max(|clean|, |incremental|)` descending. Rules with both axes at zero are hidden — exception: F9 (`build-setting/eager-linking-disabled`) stays visible because it is the designed null-delta refusal-path test.
 8. **Top-N + approval**. Print the top-N table; prompt `Enter choice [1..N or s]:`. `--rule-id` skips the prompt. Pick `s` (skip) → `outcome=info:user-declined`. Empty top-N → `abort:no-actionable`.
-9. **Worktree setup**. `git worktree add --detach /tmp/REDACTED-doctor-<UTC-ts>/ develop` from the user's primary checkout. Then `git submodule update --init --recursive` inside the worktree (best-effort; tolerated rc≠0 for projects without submodules). On worktree failure → `abort:worktree-failed`.
+9. **Worktree setup**. `git worktree add --detach /tmp/ios-build-doctor-<UTC-ts>/ develop` from the user's primary checkout. Then `git submodule update --init --recursive` inside the worktree (best-effort; tolerated rc≠0 for projects without submodules). On worktree failure → `abort:worktree-failed`.
 10. **Fix**. Subprocess `scripts/fix.py` with `--reuse-measurement-pre` pointing at the step-3 measurement (saves the duplicate baseline benchmark) and **always** with `--auto-approve --allow-refusal --allow-manual`. Doctor already got the user's pick at step 8, so fix.py's own `[y/N]` prompt is unwanted; refusal is honest-PASS for the demo; and manual rules are routed through fix.py with `--allow-manual` to capture a `refused-null` fix-result for tuning data.
 11. **Read fix-result.json**, propagate the outcome verbatim, and compute the predicted-vs-actual line:
     - `gap = |predicted - actual|`
@@ -77,13 +77,13 @@ Eight numbered questions; answers populate `DoctorContext`. Auto-detect first; a
 
 ## Top-N ranking
 
-The doctor's top-N table follows two rules: **auto-applicable rules first**, then **descending magnitude** by `max(|clean|, |incremental|)`. On REDACTED develop, that places F4 (`build-setting/compilation-cache-disabled`, predicted -183.5s clean) at rank 1 reliably; F3 and F1 (or F9 with its designed null-delta) typically fill ranks 2–3.
+The doctor's top-N table follows two rules: **auto-applicable rules first**, then **descending magnitude** by `max(|clean|, |incremental|)`. On a representative private-corpus checkout this places F4 (`build-setting/compilation-cache-disabled`, predicted ~-183.5s clean) at rank 1 reliably; F3 and F1 (or F9 with its designed null-delta) typically fill ranks 2–3. TODO(public-cite: NetNewsWire) confirm rankings against the public-cite project.
 
 Each row prints rule_id, predicted Δ on each axis, the auto-apply YES/NO badge (from the registry), confidence, and (when present) the diagnose finding's title. The user enters `1..N` or `s`.
 
 ## Manual-only rules (F5/F6/F7)
 
-These are informational rules — the v1 fixer for each is a no-op that produces a manual recipe in `applied_fix.notes`. Per the Phase A plan decision, the doctor **always** forwards `--allow-manual` to fix.py so:
+These are informational rules — the v1 fixer for each is a no-op that produces a manual recipe in `applied_fix.notes`. The doctor **always** forwards `--allow-manual` to fix.py so:
 
 - The user can still pick F5/F6/F7 from the top-N list.
 - fix.py applies the no-op, runs the post-fix benchmark, and emits `outcome=refused-null` (per `schemas/fix-result.schema.json` — null delta on the relevant axis when no real edit was made).
@@ -141,7 +141,7 @@ The `abort:` and `info:` prefixes are doctor-only; they never collide with fix.p
 
 ## Self-imposed rules
 
-- **Doctor never edits the user's working tree.** All apply happens in `git worktree add /tmp/REDACTED-doctor-<UTC-ts>/`. The user's primary checkout's HEAD is read-only to the doctor.
+- **Doctor never edits the user's working tree.** All apply happens in `git worktree add /tmp/ios-build-doctor-<UTC-ts>/`. The user's primary checkout's HEAD is read-only to the doctor.
 - **Doctor never claims a win that fix.py refused.** The transcript reproduces `fix-result.json.outcome` verbatim. If fix.py says `refused-regressive`, the transcript says `refused-regressive` — never "almost" or "borderline".
 - **Doctor's top-N prompt is the only user-visible decision point.** fix.py is always run with `--auto-approve` to avoid double-prompts in the transcript.
 - **Doctor always forwards `--allow-manual`** so manual rules emit `refused-null` fix-results in the same artifact stream as auto-applicable rules.
@@ -149,11 +149,10 @@ The `abort:` and `info:` prefixes are doctor-only; they never collide with fix.p
 ## References
 
 - [`scripts/doctor.py`](../../scripts/doctor.py) — orchestrator; argparse CLI; the eight workflow steps.
-- [`scripts/benchmark.py`](../../scripts/benchmark.py) — measure CLI (Phase A).
-- [`scripts/diagnose.py`](../../scripts/diagnose.py) — diagnose CLI (Phase A).
-- [`scripts/simulate.py`](../../scripts/simulate.py) — simulate CLI (Phase A).
-- [`scripts/fix.py`](../../scripts/fix.py) — fix CLI (Phase A); doctor reuses `_find_git_root` via import.
+- [`scripts/benchmark.py`](../../scripts/benchmark.py) — measure CLI.
+- [`scripts/diagnose.py`](../../scripts/diagnose.py) — diagnose CLI.
+- [`scripts/simulate.py`](../../scripts/simulate.py) — simulate CLI.
+- [`scripts/fix.py`](../../scripts/fix.py) — fix CLI; doctor reuses `_find_git_root` via import.
 - [`scripts/fixers/registry.py`](../../scripts/fixers/registry.py) — auto_apply flag per rule_id, used to filter the top-N.
 - [`schemas/fix-result.schema.json`](../../schemas/fix-result.schema.json) — outcome enum that doctor's superset extends.
-- [`docs/PLAN.md`](../../docs/PLAN.md) "Questionnaire — pre-execution UX" + "Per-chat protocol" — the contract this skill executes.
-- [`docs/demo/swiftcraft-loop-2026-05-05.md`](../../docs/demo/swiftcraft-loop-2026-05-05.md) — canonical SwiftCraft demo transcript (produced by `--rule-id build-setting/compilation-cache-disabled` against REDACTED develop @ `REDACTED`).
+- [`docs/PLAN.md`](../../docs/PLAN.md) "Questionnaire — pre-execution UX" + "Per-skill protocol" — the contract this skill executes.

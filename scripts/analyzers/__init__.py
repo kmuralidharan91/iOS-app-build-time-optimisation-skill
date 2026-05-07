@@ -1,4 +1,4 @@
-"""Analyzer registry + Finding dataclass for ios-build-diagnose (Phase A).
+"""Analyzer registry + Finding dataclass for ios-build-diagnose.
 
 Each analyzer module under this package exposes a single ``run(context)``
 entry point. The orchestrator in ``scripts/diagnose.py`` constructs a
@@ -9,7 +9,7 @@ imports each analyzer, and concatenates the returned Finding lists.
 The split between Finding and Recommendation is intentional:
 
 - ``Finding`` lives in ``findings[]`` of the diagnosis artifact and is
-  scored against the Phase A ground truth.
+  scored against the ground truth.
 - ``Recommendation`` lives in ``additional_recommendations[]`` and
   carries suite-value-add (e.g. PR-#2 sandboxing + fuse audit) that is
   not in the F1–F9 ground truth. Keeping them separate lets the
@@ -26,7 +26,7 @@ from typing import Any, Literal
 ImpactCategory = Literal["high", "medium", "low", "unknown"]
 EvidenceKind = Literal["file_line", "setting", "measurement", "filesystem"]
 PredictionMethod = Literal[
-    "measured-on-REDACTED",
+    "measured-on-private-corpus",
     "measured-on-wikipedia",
     "heuristic",
     "literature",
@@ -106,7 +106,7 @@ class DiagnosisContext:
     scheme: str | None
     configuration: str
     platform: str
-    measurement: dict[str, Any] | None  # parsed measurement.json (Phase A artifact)
+    measurement: dict[str, Any] | None  # parsed measurement.json (benchmark artifact)
     resolved_settings: dict[str, str]
     script_phases: list[Any]   # list[ScriptPhase] from xcode_adapter
     package_graph: Any | None  # PackageGraph from xcode_adapter

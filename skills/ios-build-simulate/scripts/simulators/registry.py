@@ -32,9 +32,10 @@ PredictorFn = Callable[
 def build_registry(*, f6_verified: bool = False) -> dict[str, PredictorFn]:
     """Construct the rule_id -> predictor mapping.
 
-    ``f6_verified`` reflects the Phase A S6a follow-up outcome; the
-    swift-syntax-not-prebuilt predictor varies its tuning_data_point
-    text based on whether the Xcode 26 prebuilt mechanism was confirmed.
+    ``f6_verified`` reflects whether the Xcode 26 prebuilt-syntax
+    mechanism has been confirmed against the project's resolved
+    swift-syntax pin; the swift-syntax-not-prebuilt predictor varies
+    its tuning_data_point text based on that flag.
     """
 
     def f6_predictor(
@@ -101,7 +102,7 @@ def predict_unknown(
         prerequisites=(),
         applies_when=(),
         notes=(
-            "This rule fired in diagnosis but has no Phase A simulate "
+            "This rule fired in diagnosis but has no registered simulate "
             "predictor. Add scripts/simulators/<family>.py::predict_<rule>() "
             "and register it in registry.build_registry().",
         ),

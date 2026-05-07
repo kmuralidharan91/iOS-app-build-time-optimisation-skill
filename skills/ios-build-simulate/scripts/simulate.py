@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """ios-build-simulate CLI — predict Δ wall-clock per diagnose rule.
 
-Reads a Phase A ``diagnosis.json`` (and optionally a Phase A
-``measurement.json`` for project-context-aware predictions) and emits a
+Reads a ``diagnosis.json`` (and optionally a ``measurement.json`` for
+project-context-aware predictions) and emits a
 JSON artifact conforming to ``schemas/simulation.schema.json``. Each
 prediction aggregates findings sharing a rule_id into ONE
 ``RulePrediction`` and carries a ``tuning_data_point`` on both clean and
@@ -212,13 +212,13 @@ def simulate(
         notes.append(
             "No --measurement-artifact supplied; predictors that consume "
             "it (compilation-cache, asset-catalog, oversized-module) fall "
-            "back to REDACTED reference data with reduced confidence."
+            "back to private-corpus reference data with reduced confidence."
         )
     if not f6_verified:
         notes.append(
             "F6 (spm/swift-syntax-not-prebuilt) prediction is best-effort: "
             "Xcode 26 prebuilt-swift-syntax mechanism UNVERIFIED at line "
-            "level (Phase A deferred). See references/sources.md."
+            "level (deferred). See references/sources.md."
         )
 
     predictions: list[RulePrediction] = []
@@ -273,12 +273,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--diagnosis-artifact", required=True, type=pathlib.Path,
-        help="Path to a Phase A diagnosis.json (ios-build-diagnose output).",
+        help="Path to a diagnosis.json (ios-build-diagnose output).",
     )
     parser.add_argument(
         "--measurement-artifact", default=None, type=pathlib.Path,
         help=(
-            "Optional path to a Phase A measurement.json. Predictors that "
+            "Optional path to a measurement.json. Predictors that "
             "consume baseline timings (F4 compilation-cache, F5 "
             "asset-catalog, F7 oversized-module) use it when supplied."
         ),
@@ -290,7 +290,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--f6-verified", action="store_true",
         help=(
-            "Set when Phase A S6a confirms the Xcode 26 "
+            "Set when the deferred verify confirms the Xcode 26 "
             "prebuilt-swift-syntax mechanism at line level. Affects the "
             "F6 prediction's tuning_data_point text."
         ),

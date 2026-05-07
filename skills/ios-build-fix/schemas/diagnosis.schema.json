@@ -146,7 +146,7 @@
             "method": {
               "type": "string",
               "enum": [
-                "measured-on-REDACTED",
+                "measured-on-private-corpus",
                 "measured-on-wikipedia",
                 "heuristic",
                 "literature"

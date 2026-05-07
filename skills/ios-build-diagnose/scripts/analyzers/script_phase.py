@@ -1,4 +1,4 @@
-"""Script-phase analyzer — covers F1, F2, F3, F8 of the Phase A ground truth.
+"""Script-phase analyzer — covers F1, F2, F3, F8 of the ground truth.
 
 Reads the ``script_phases`` field of the DiagnosisContext (a list of
 ``ScriptPhase`` dataclasses produced by ``xcode_adapter.script_phases``)
@@ -289,13 +289,14 @@ def _check_missing_debug_guard(
         ),
         impact_category="medium",
         wall_clock_predicted=WallClockPrediction(
-            method="measured-on-REDACTED",
+            method="measured-on-private-corpus",
             estimate_seconds=3.0,
             min_seconds=2.0,
             max_seconds=4.0,
             notes=(
-                "On REDACTED both Crashlytics and dSYM-upload phases run on "
-                "every Debug build; gating them with $CONFIGURATION="
+                "TODO(public-cite: NetNewsWire) confirm: Crashlytics and "
+                "dSYM-upload phases run on every Debug build on the "
+                "private corpus; gating them with $CONFIGURATION="
                 "\"Debug\" early-exit recovers the run time."
             ),
         ),
@@ -337,14 +338,15 @@ def _check_missing_output_declarations(phase) -> Iterable[Finding]:
         ),
         impact_category=impact,
         wall_clock_predicted=WallClockPrediction(
-            method="measured-on-REDACTED",
+            method="measured-on-private-corpus",
             estimate_seconds=4.0,
             min_seconds=3.0,
             max_seconds=5.0,
             notes=(
-                "On REDACTED, the 5 phases without output declarations defeat "
-                "Xcode's ‘run only when inputs change’ optimisation; "
-                "estimate is per-build incremental cost."
+                "TODO(public-cite: NetNewsWire) confirm magnitude: phases "
+                "without output declarations defeat Xcode's 'run only "
+                "when inputs change' optimisation; estimate is per-build "
+                "incremental cost."
             ),
         ),
         citation=Citation(

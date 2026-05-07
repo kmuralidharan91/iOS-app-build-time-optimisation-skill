@@ -1,8 +1,8 @@
 # Citation index — `references/sources.md`
 
-> Every URL referenced from a Phase A finding citation, an analyzer rule
+> Every URL referenced from a finding citation, an analyzer rule
 > docstring, or a SKILL.md "References" block, with the verification
-> note required by project [`CLAUDE.md`](../../Desktop/Command+B/CLAUDE.md) Rule 1.
+> note required by project `CLAUDE.md` Rule 1.
 
 ## Apple — Xcode build system + build settings
 
@@ -13,27 +13,27 @@
 | `apple/asset-management` | <https://developer.apple.com/documentation/xcode/asset-management> | 2026-05-04 (Apple-canonical landing page for `actool` / asset catalog reference) | F5 asset-catalog finding |
 | `apple/swift-packages` | <https://developer.apple.com/documentation/xcode/swift-packages> | 2026-05-04 (Apple's Swift Package documentation hub) | F7 spm/oversized-module, R1 branch-pinned suppression |
 | `apple/xcode-14-release-notes` | <https://developer.apple.com/documentation/xcode-release-notes/xcode-14-release-notes> | 2026-05-04 via WebFetch (resolves 200 OK) | F3 reference (script-phase output declarations) |
-| `apple/xcode-26-release-notes` | <https://developer.apple.com/documentation/xcode-release-notes/xcode-26-release-notes> | 2026-05-04 line-level verified by Phase A S6a: SPA marketing-shell HTML returns title only; full content fetched from JSON endpoint `https://developer.apple.com/tutorials/data/documentation/xcode-release-notes/xcode-26-release-notes.json`. Section "Swift Macros Build Performance → New Features" contains the verbatim sentence "Build for Swift macro targets is accelerated by downloading a prebuilt library for swift-syntax from swift.org and integrating it into the build. This feature is enabled automatically and will improve build times for these projects.  (151701829)". The mechanism is **enabled automatically** in Xcode 26 (NOT opt-in via a build setting); the only knob is the user-defaults opt-out `defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts NO`, documented as a workaround for two listed Resolved Issues (151701829 / 152253497 / 152443472). | F6 spm/swift-syntax-not-prebuilt |
+| `apple/xcode-26-release-notes` | <https://developer.apple.com/documentation/xcode-release-notes/xcode-26-release-notes> | 2026-05-04 line-level verified: SPA marketing-shell HTML returns title only; full content fetched from JSON endpoint `https://developer.apple.com/tutorials/data/documentation/xcode-release-notes/xcode-26-release-notes.json`. Section "Swift Macros Build Performance → New Features" contains the verbatim sentence "Build for Swift macro targets is accelerated by downloading a prebuilt library for swift-syntax from swift.org and integrating it into the build. This feature is enabled automatically and will improve build times for these projects.  (151701829)". The mechanism is **enabled automatically** in Xcode 26 (NOT opt-in via a build setting); the only knob is the user-defaults opt-out `defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts NO`, documented as a workaround for two listed Resolved Issues (151701829 / 152253497 / 152443472). | F6 spm/swift-syntax-not-prebuilt |
 | `apple/xcodebuild-man` | <https://keith.github.io/xcode-man-pages/xcodebuild.1.html> | 2026-05-04 (mirror of `xcodebuild(1)` man page; Apple does not host an HTML man page) | adapter `show_build_settings`, SKILL.md |
 
 ## Apple — WWDC sessions
 
 | ID | URL | Verified | Used by |
 | --- | --- | --- | --- |
-| `wwdc/2022/110364` | <https://developer.apple.com/videos/play/wwdc2022/110364/> | 2026-05-04 via WebFetch (session title "Demystify parallelization in Xcode builds" confirmed); transcript also on disk at `~/Desktop/Command+B/transcripts/xcode-build-parallelization-wwdc2022.md`, every quote in `build-settings-best-practices.md` `grep -F`'d against it | F1, F2, F3, F8 + PR-#2 sandboxing/fuse |
+| `wwdc/2022/110364` | <https://developer.apple.com/videos/play/wwdc2022/110364/> | 2026-05-04 via WebFetch (session title "Demystify parallelization in Xcode builds" confirmed); transcript verified on disk, every quote in `build-settings-best-practices.md` `grep -F`'d against it | F1, F2, F3, F8 + PR-#2 sandboxing/fuse |
 
-## Tuist + Bazel (carried forward from Phase A)
+## Tuist + Bazel
 
 | ID | URL | Verified | Used by |
 | --- | --- | --- | --- |
-| `tuist/manifests` | <https://tuist.dev/en/docs/guides/features/projects/manifests> | 2026-05-04 — verified live via the Phase A redirect handling (`docs.tuist.dev` -> `tuist.dev/en/docs/...`); Tuist adapter `detect()` rule | adapter detection |
-| `bazel/apple` | <https://bazel.build/docs/bazel-and-apple> | 2026-05-04 (Phase A carry-over; Bazel iOS adapter detection rule) | adapter detection |
-| `bazel/rules_apple` | <https://github.com/bazelbuild/rules_apple> | 2026-05-04 (Phase A carry-over) | adapter detection |
+| `tuist/manifests` | <https://tuist.dev/en/docs/guides/features/projects/manifests> | 2026-05-04 — verified live via redirect handling (`docs.tuist.dev` -> `tuist.dev/en/docs/...`); Tuist adapter `detect()` rule | adapter detection |
+| `bazel/apple` | <https://bazel.build/docs/bazel-and-apple> | 2026-05-04 (Bazel iOS adapter detection rule) | adapter detection |
+| `bazel/rules_apple` | <https://github.com/bazelbuild/rules_apple> | 2026-05-04 | adapter detection |
 
 ## Verification protocol
 
-Every URL added or used by a chat-N finding **must** appear in the table
-above with a verification date. When Phase A+ adds a new citation:
+Every URL added or used by a finding **must** appear in the table
+above with a verification date. When a new citation is added:
 
 1. `WebFetch` (or `curl -I` for SPA-style pages whose body is JSON-loaded
    after the shell HTML) the URL to confirm it resolves.
@@ -46,4 +46,4 @@ above with a verification date. When Phase A+ adds a new citation:
 When a citation is to a long page (release notes, transcripts), prefer
 to also pull the relevant verbatim quote into
 `references/build-settings-best-practices.md` and `grep -F` it against
-the on-disk source so future chats have the quote without re-fetching.
+the on-disk source so future maintainers have the quote without re-fetching.

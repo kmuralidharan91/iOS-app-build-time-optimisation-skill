@@ -1,14 +1,14 @@
 """Asset-catalog analyzer — covers F5 (CompileAssetCatalogVariant on incremental).
 
-Reads the Phase A ``measurement.json`` artifact's ``critical_path``
+Reads the benchmark ``measurement.json`` artifact's ``critical_path``
 section. When ``CompileAssetCatalogVariant`` is in the incremental
 build's ranked task-class list with a total duration above the
-``asset-catalog/incremental >= 5s`` threshold from
+``asset-catalog/incremental >= 3s`` threshold from
 ``references/defaults.md``, we emit a Finding.
 
-The threshold is sized to REDACTED's 4/26 baseline measurement
-(``CompileAssetCatalogVariant=8.694s`` on incremental Debug builds);
-Phase A+ tunes it on more projects.
+The threshold is sized against a private-corpus baseline measurement
+on incremental Debug builds. TODO(public-cite: NetNewsWire) confirm
+the threshold against a public iOS project.
 
 Rule id: ``asset-catalog/incremental-recompile``.
 """
@@ -78,7 +78,7 @@ def run(context: DiagnosisContext) -> list[Finding]:
             ),
             impact_category="high" if duration_seconds >= 6.0 else "medium",
             wall_clock_predicted=WallClockPrediction(
-                method="measured-on-REDACTED",
+                method="measured-on-private-corpus",
                 estimate_seconds=duration_seconds,
                 min_seconds=max(duration_seconds - 2.0, 0.0),
                 max_seconds=duration_seconds,
@@ -87,9 +87,9 @@ def run(context: DiagnosisContext) -> list[Finding]:
                     "unchanged; non-zero incremental cost almost always "
                     "traces back to an upstream input invalidation, often "
                     "a script phase that mutates xcassets contents on "
-                    "every build (REDACTED Phase B Backtrace traced this to "
-                    "Step6_resetXCAssets git checkout when "
-                    "RESET_RESOURCES=ENABLED)."
+                    "every build. TODO(public-cite: NetNewsWire) confirm "
+                    "the equivalent root-cause script phase if the public "
+                    "project exhibits the same pattern."
                 ),
             ),
             citation=Citation(

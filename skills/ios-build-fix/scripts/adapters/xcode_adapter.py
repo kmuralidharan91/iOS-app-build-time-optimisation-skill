@@ -1,15 +1,15 @@
 """Xcode adapter — measurement + diagnose surface for the build skills.
 
 The measurement parts (``measure``, ``time_one_build``, ``run_clean``)
-ship in Phase A for ``ios-build-measure``. The diagnose-side methods
-(``show_build_settings``, ``script_phases``, ``package_graph``) ship
-in Phase A: ``show_build_settings`` invokes
+serve ``ios-build-measure``. The diagnose-side methods
+(``show_build_settings``, ``script_phases``, ``package_graph``) serve
+``ios-build-diagnose``: ``show_build_settings`` invokes
 ``xcodebuild -showBuildSettings -json``; ``script_phases`` parses
 ``project.pbxproj`` plists for ``PBXShellScriptBuildPhase`` entries;
 ``package_graph`` walks ``Package.resolved`` and ``Package.swift``
 manifests. Fix application is **not** an adapter responsibility — see
 ``scripts/fixers/registry.py`` (per-rule fixer modules) and
-``scripts/fix.py`` (orchestrator) for the Phase A design.
+``scripts/fix.py`` (orchestrator) for the fix-step design.
 
 Wall-clock-only measurement strategy:
 
@@ -250,7 +250,7 @@ def measure(
     )
 
 
-# --- diagnose / fix surface — Phase A/4 stubs ------------------------------
+# --- diagnose / fix surface ------------------------------
 
 def show_build_settings(
     project_path: pathlib.Path,
@@ -426,7 +426,7 @@ def script_phases(
     Missing ``inputPaths`` / ``outputPaths`` keys are coerced to empty
     tuples so ``analyzers/script_phase.py`` fires the
     missing-output-declarations rule against the same shape it expects
-    from Phase A's known-good ground truth.
+    from the known-good ground truth.
     """
 
     require_ios(platform)
@@ -575,11 +575,9 @@ def package_graph(
         if package_dir_str in seen_module_paths:
             continue
         seen_module_paths.add(package_dir_str)
-        # Use the directory name as the canonical SPM identity. REDACTED's
-        # `REDACTED` directory contains a `Package.swift` whose name
-        # field is `REDACTEDREDACTED`; Phase A's known-good ground truth
-        # surfaces the directory name (`REDACTED`), and the diagnose
-        # rule's evidence path is the directory anyway.
+        # Use the directory name as the canonical SPM identity. The
+        # diagnose rule's evidence path is the directory anyway, and
+        # the known-good ground truth surfaces the directory name.
         name = package_dir.name
         source_count = _count_swift_sources(package_dir)
         local_modules.append(LocalModule(

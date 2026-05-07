@@ -1,11 +1,11 @@
 ---
 name: ios-build-fix
-description: Apply a single approved finding from ios-build-diagnose to an Xcode project on a throwaway branch, re-measure with ios-build-measure, report wall-clock delta, and refuse to claim success when the delta is null, regressive, or within variance noise. Single-fix-at-a-time; atomic git-aware (creates a branch named gh-skill-test/<rule-slug>-<timestamp>); predicted-vs-actual logged for every run. Auto-applicable v1 surface is F1 (random-sleep), F3 (sandbox+fuse via xcconfig), F4 (compilation-cache-disabled), F9 (eager-linking-disabled, designed null-delta refusal-path test); F5/F6/F7 emit a manual recipe and refuse to mutate the tree without --allow-manual. Use when the user wants a fix applied + verified end-to-end, not just predicted; refuse politely otherwise.
+description: Apply a single approved finding from ios-build-diagnose to an Xcode project on a throwaway branch, re-measure with ios-build-measure, report wall-clock delta, and refuse to claim success when the delta is null, regressive, or within variance noise. Single-fix-at-a-time; atomic git-aware (creates a branch named ios-build-fix/<rule-slug>-<timestamp>); predicted-vs-actual logged for every run. Auto-applicable v1 surface is F1 (random-sleep), F3 (sandbox+fuse via xcconfig), F4 (compilation-cache-disabled), F9 (eager-linking-disabled, designed null-delta refusal-path test); F5/F6/F7 emit a manual recipe and refuse to mutate the tree without --allow-manual. Use when the user wants a fix applied + verified end-to-end, not just predicted; refuse politely otherwise.
 ---
 
 # `ios-build-fix`
 
-Applies one diagnose finding (or a group of same-rule findings) to a real Xcode project, re-measures wall-clock via `ios-build-measure`, and emits a `fix-result.json` artifact whose `outcome` field carries the verdict honestly: `success`, `refused-null`, `refused-regressive`, `refused-noise`, `refused-apply-error`, or `refused-benchmark-error`. The fixer never claims a win when the post-fix delta is null, regressive, or within the variance threshold — that refusal is the credibility hinge for the doctor-loop demo (Phase A).
+Applies one diagnose finding (or a group of same-rule findings) to a real Xcode project, re-measures wall-clock via `ios-build-measure`, and emits a `fix-result.json` artifact whose `outcome` field carries the verdict honestly: `success`, `refused-null`, `refused-regressive`, `refused-noise`, `refused-apply-error`, or `refused-benchmark-error`. The fixer never claims a win when the post-fix delta is null, regressive, or within the variance threshold — that refusal is the credibility hinge for the doctor-loop demo.
 
 ## When to use
 
@@ -15,22 +15,22 @@ Reach for this skill when the user wants the **apply** answer:
 - "I approved this finding from diagnose; go fix it on a throwaway branch."
 - "Run the fix end-to-end and refuse if the win is noise."
 
-If the user wants the predicted Δ (no apply), use [`ios-build-simulate`](../ios-build-simulate/SKILL.md). If they want the audit, use [`ios-build-diagnose`](../ios-build-diagnose/SKILL.md). If they want the full questionnaire → measure → diagnose → simulate → fix → re-measure loop in one transcript, use `ios-build-doctor` (Phase A; this skill is the apply step).
+If the user wants the predicted Δ (no apply), use [`ios-build-simulate`](../ios-build-simulate/SKILL.md). If they want the audit, use [`ios-build-diagnose`](../ios-build-diagnose/SKILL.md). If they want the full questionnaire → measure → diagnose → simulate → fix → re-measure loop in one transcript, use `ios-build-doctor`; this skill is the apply step.
 
 ## Inputs
 
 | Argument | Required | Default | Notes |
 | --- | --- | --- | --- |
-| `--diagnosis-artifact PATH` | yes | — | Phase A `diagnosis.json` (`ios-build-diagnose` output). |
-| `--simulation-artifact PATH` | no | — | Phase A `simulation.json` (`ios-build-simulate` output). When supplied, the predicted Δ is recorded in the fix-result and used to compute `within_predicted_band`. |
+| `--diagnosis-artifact PATH` | yes | — | `diagnosis.json` (`ios-build-diagnose` output). |
+| `--simulation-artifact PATH` | no | — | `simulation.json` (`ios-build-simulate` output). When supplied, the predicted Δ is recorded in the fix-result and used to compute `within_predicted_band`. |
 | `--rule-id RULE` | yes | — | One rule_id from the diagnosis. All findings sharing that rule_id are closed by a single atomic edit. |
 | `--project-root DIR` | yes | — | Throwaway worktree of the project. The fixer creates a branch here; never edit the user's working tree directly. |
-| `--branch-prefix PREFIX` | no | `gh-skill-test` | Branch is named `<prefix>/<rule-slug>-<UTC-timestamp>`. |
+| `--branch-prefix PREFIX` | no | `ios-build-fix` | Branch is named `<prefix>/<rule-slug>-<UTC-timestamp>`. |
 | `--output-dir DIR` | yes | — | Where `fix-result.json` + per-axis `measurement-pre/`, `measurement-post/` are written. |
-| `--auto-approve` | no | off | Skip the `[y/N]` preview prompt. Required for non-interactive use (Phase A smoke + doctor-loop). |
+| `--auto-approve` | no | off | Skip the `[y/N]` preview prompt. Required for non-interactive use (smoke runs + doctor-loop). |
 | `--allow-refusal` | no | off | Exit `0` even when the outcome is `refused-*`. Used for the F9 designed null-delta refusal-path test. |
 | `--allow-manual` | no | off | Allow informational rule_ids (F5/F6/F7) to no-op-apply for record-keeping. Without it, the orchestrator refuses these rules with a clear error. |
-| `--variance-threshold-pct N` | no | `10.0` | Percent-of-baseline floor below which `|delta|` is classified as noise. Matches Phase A measure-gate spec. |
+| `--variance-threshold-pct N` | no | `10.0` | Percent-of-baseline floor below which `|delta|` is classified as noise. Matches the measure-gate spec. |
 | `--repeats N` | no | `3` | Forwarded to `benchmark.py`. |
 | `--build-types LIST` | no | `incremental` | Comma-separated; `clean` and/or `incremental`. |
 | `--touch-file PATH` | when `incremental` is requested | — | Forwarded to `benchmark.py`. |
@@ -50,7 +50,7 @@ If the user wants the predicted Δ (no apply), use [`ios-build-simulate`](../ios
 7. **Compute deltas + outcome**. Per-axis (clean / incremental):
    - `delta_seconds = post_median − pre_median` (negative = improvement).
    - `exceeds_variance = |delta| > variance_threshold_pct × max(pre_median, post_median) / 100`.
-   - `within_predicted_band` (when simulation supplied): `|delta − predicted| ≤ 0.5 × |predicted|` per the Phase A ±50 % rule.
+   - `within_predicted_band` (when simulation supplied): `|delta − predicted| ≤ 0.5 × |predicted|` per the simulate ±50 % rule.
    - **Outcome decision**:
      - both axes `delta is None` ⇒ `refused-null`.
      - any axis `delta < 0` AND `exceeds_variance` ⇒ `success` (single-axis win is enough).
@@ -98,24 +98,23 @@ Top-level fields of `fix-result.json` (full schema in `schemas/fix-result.schema
 
 ## Auto-applicable surface (v1)
 
-| rule_id | auto_apply | Edit kind | REDACTED fix target |
+| rule_id | auto_apply | Edit kind | Fix target |
 | --- | :---: | --- | --- |
-| `script-phase/random-sleep` (F1) | ✓ | `delete-line` | `REDACTED/scripts/XcodeBuildSteps/Step7_RunCrashlytics.sh:13` (and any other matching `sleep $[ ... ]s`). |
-| `script-phase/missing-output-declarations` (F3) | ✓ | `edit-xcconfig` | `REDACTED/Configurations/Project/Local/local-debug.xcconfig` — appends `ENABLE_USER_SCRIPT_SANDBOXING = YES` + `FUSE_BUILD_SCRIPT_PHASES = YES`. |
+| `script-phase/random-sleep` (F1) | ✓ | `delete-line` | The first matching `sleep $[ ... ]s` line in any reachable build-phase script. |
+| `script-phase/missing-output-declarations` (F3) | ✓ | `edit-xcconfig` | `Configurations/Project/Local/local-debug.xcconfig` — appends `ENABLE_USER_SCRIPT_SANDBOXING = YES` + `FUSE_BUILD_SCRIPT_PHASES = YES`. |
 | `build-setting/compilation-cache-disabled` (F4) | ✓ | `edit-xcconfig` | Same xcconfig — appends `COMPILATION_CACHE_ENABLE_CACHING = YES`. Warm-cache test required. |
 | `build-setting/eager-linking-disabled` (F9) | ✓ | `edit-xcconfig` | Same xcconfig — appends `EAGER_LINKING = YES`. Designed null-delta refusal-path test. |
 | `asset-catalog/incremental-recompile` (F5) | ✗ | `no-op` | Manual recipe in preview. |
 | `spm/swift-syntax-not-prebuilt` (F6) | ✗ | `no-op` | "Upgrade to Xcode 26" — manual recipe. |
 | `spm/oversized-module` (F7) | ✗ | `no-op` | Module-split is architectural; recipe only. |
 
-The xcconfig path is REDACTED-shaped for v1; the lookup is in `scripts/fixers/{script_phase,build_setting}.py::_*xcconfig*` and extends to other layouts by adding candidate paths.
+The xcconfig lookup is in `scripts/fixers/{script_phase,build_setting}.py::_*xcconfig*` and extends to other layouts by adding candidate paths. TODO(public-cite: NetNewsWire) confirm or extend the candidate paths for the public-cite project layout.
 
 ## References
 
 - [`schemas/fix-result.schema.json`](../../schemas/fix-result.schema.json) — output artifact contract.
 - [`scripts/fix.py`](../../scripts/fix.py) — orchestrator; argparse CLI; refusal logic.
 - [`scripts/fixers/`](../../scripts/fixers/) — per-rule fixers; `registry.py` is the dispatch table.
-- [`scripts/benchmark.py`](../../scripts/benchmark.py) — pre/post measurement (Phase A).
-- [`docs/smoke/3/scoring.md`](../../docs/smoke/3/scoring.md) — recommended Phase A picks (F3 success, F9 refusal).
+- [`scripts/benchmark.py`](../../scripts/benchmark.py) — pre/post measurement.
 - [`references/defaults.md`](../../references/defaults.md) — variance-threshold tuning data + per-rule prediction tuning points.
-- [`docs/PLAN.md`](../../docs/PLAN.md) "Verification — Fix gate" — Phase A effectiveness gate criteria.
+- [`docs/PLAN.md`](../../docs/PLAN.md) "Verification — Fix gate" — fix-step effectiveness gate criteria.

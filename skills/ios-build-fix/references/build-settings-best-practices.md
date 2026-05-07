@@ -2,10 +2,8 @@
 
 > Companion file to `scripts/analyzers/build_setting.py`. Every audit
 > entry below carries a **Why**, **Recommended**, **Measurement**, and
-> **Risk** subsection. WWDC quotes are byte-identical against the
-> on-disk transcript at
-> `~/Desktop/Command+B/transcripts/xcode-build-parallelization-wwdc2022.md`
-> (verified with `grep -F` in Phase A; see `docs/verification/2.md`).
+> **Risk** subsection. WWDC quotes are verified verbatim against the
+> session transcript and tracked in `references/sources.md`.
 
 ## `COMPILATION_CACHE_ENABLE_CACHING`
 
@@ -23,17 +21,18 @@ configuration). Leave Release / Distribution decisions to the team
 that ships builds — release pipelines often want `clean` semantics
 to avoid masking determinism bugs.
 
-**Measurement.** On the REDACTED `develop` baseline
-(2026-04-26 measurement), a warm-cache clean Debug+sim build came in
-**~45.6% faster** than the cold-cache equivalent (≈125s saved on a
-275s baseline). Numbers will vary with project shape; Phase A+
-records the per-project tuning data point.
+**Measurement.** On a private-corpus baseline a warm-cache clean
+Debug+sim build came in **~45.6% faster** than the cold-cache
+equivalent (≈125s saved on a 275s baseline). Numbers will vary with
+project shape. TODO(public-cite: NetNewsWire) record the per-project
+tuning data point.
 
 **Risk.** Incremental builds can pay a small cache-invalidation cost
-(REDACTED measured ~10s extra on touched-file change) because the cache
-sees a wider invalidation cone than Xcode's per-target incremental
-tracker. Net positive on every REDACTED measurement so far, but track the
-per-project trade-off rather than enabling blindly.
+(~10s extra on touched-file change observed against the private
+corpus) because the cache sees a wider invalidation cone than Xcode's
+per-target incremental tracker. Net positive on every private-corpus
+measurement so far, but track the per-project trade-off rather than
+enabling blindly. TODO(public-cite: NetNewsWire) confirm.
 
 ## `EAGER_LINKING`
 
@@ -50,14 +49,14 @@ fit the eager-link shape (pure-Swift dynamic frameworks linked by
 their dependents). Diagnose flags `unset` / `NO` and lets simulate +
 fix decide whether the project's actual graph benefits.
 
-**Measurement.** On REDACTED Phase v1→v2, enabling `EAGER_LINKING`
+**Measurement.** On a private-corpus baseline, enabling `EAGER_LINKING`
 measured **zero clean-build improvement** and the change was
-reverted in the user-vetted `optimization-plan.md`. F9's
-`impact_category=low` reflects that. Wikipedia iOS / NetNewsWire
-checkouts will tune this more in Phase A+.
+reverted. F9's `impact_category=low` reflects that.
+TODO(public-cite: NetNewsWire, Wikipedia-iOS) tune this against the
+public projects.
 
 **Risk.** Almost none — the optimisation only changes scheduling.
-The mitigation when impact is null is to revert; the Phase A
+The mitigation when impact is null is to revert; the
 `ios-build-fix` re-measure step refuses to claim success when delta
 is null or regressive, which catches this case automatically.
 
@@ -84,7 +83,7 @@ Apply per target (and as a project-default once existing phases have correct inp
 
 **Risk.** Existing phases with undeclared dependencies will fail to
 build until they're fixed. Apply incrementally, target-by-target;
-Phase A `ios-build-fix` carries the per-finding refusal-when-broken
+`ios-build-fix` carries the per-finding refusal-when-broken
 guarantee.
 
 ## `FUSE_BUILD_SCRIPT_PHASES`
@@ -103,12 +102,12 @@ declares its inputs / outputs. The rule's `notes[]` reminds the user
 of that prerequisite ordering.
 
 **Measurement.** Wall-clock win scales with phase count and the
-spawn / setup overhead per phase. REDACTED has 14
-`PBXShellScriptBuildPhase` entries on `develop` @ `REDACTED`; the
-fuse win amortises shell-startup time across the phase chain.
-Project-shape sensitive — Phase A+ records measured-on-REDACTED numbers
-once the prerequisite (correct input/output declarations on every
-phase, F3 finding family) is applied.
+spawn / setup overhead per phase. The fuse win amortises
+shell-startup time across the phase chain. Project-shape sensitive.
+TODO(public-cite: NetNewsWire) record the project's
+`PBXShellScriptBuildPhase` count and resulting magnitude once the
+prerequisite (correct input/output declarations on every phase, F3
+finding family) is applied.
 
 **Risk.** WWDC22 110364, verbatim:
 
@@ -124,11 +123,11 @@ Rule id: `spm/swift-syntax-not-prebuilt` (F6 ground truth).
 
 > Build for Swift macro targets is accelerated by downloading a prebuilt library for swift-syntax from swift.org and integrating it into the build. This feature is enabled automatically and will improve build times for these projects.  (151701829)
 
-(Verified line-level by Phase A S6a via the SPA's JSON endpoint `https://developer.apple.com/tutorials/data/documentation/xcode-release-notes/xcode-26-release-notes.json`; HTML page is marketing-shell-only.)
+(Verified line-level via Apple's SPA JSON endpoint `https://developer.apple.com/tutorials/data/documentation/xcode-release-notes/xcode-26-release-notes.json`; the HTML page is marketing-shell-only.)
 
 **Recommended.** Use Xcode 26 (or later); leave `IDEPackageEnablePrebuilts` at its automatic-on default. There is **no project-side build setting** to flip — the mechanism is opt-in by virtue of Xcode version, not by xcconfig.
 
-**Measurement.** Estimated 5–20s clean-build savings depending on how many macro-using packages reach `swift-syntax` transitively. REDACTED REDACTED pins `swift-syntax @ 510.0.3` transitively (Package.resolved:382); Phase A simulate predicts -12s ±7s for F6 with `confidence=low` (heuristic; project-shape sensitive).
+**Measurement.** Estimated 5–20s clean-build savings depending on how many macro-using packages reach `swift-syntax` transitively. TODO(public-cite: Wikipedia-iOS, NetNewsWire) confirm the project's `Package.resolved` pins swift-syntax (transitive via Swift macros) and record the resolved version. Simulate predicts -12s ±7s for F6 with `confidence=low` (heuristic; project-shape sensitive).
 
 **Risk.** Apple's Xcode 26 release notes list two known build-failure modes for macro-dependent projects + one Legacy Preview Execution issue, all worked around by disabling the feature via `defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts NO`. Apply that workaround only when build failures around `_SwiftSyntaxCShims` appear; it disables the speedup repo-wide for that user.
 
@@ -138,10 +137,9 @@ Rule id: `spm/swift-syntax-not-prebuilt` (F6 ground truth).
 runtime — every rule body has the rule id, the WWDC / Apple URL,
 and the impact category baked into the analyzer source. This file
 is the human-facing reference that the SKILL.md links to and that
-Phase A simulate / Phase A fix consume to construct user-facing
-explanations.
+simulate / fix consume to construct user-facing explanations.
 
-When Phase A+ adds a new build-setting rule, the workflow is:
+When adding a new build-setting rule, the workflow is:
 
 1. Add a section to this file using the **Why / Recommended /
    Measurement / Risk** pattern.
@@ -150,4 +148,4 @@ When Phase A+ adds a new build-setting rule, the workflow is:
 3. Add the citation row to `references/sources.md` with a
    verification date.
 4. `grep -F` any verbatim quote against its on-disk source and log
-   the result in the chat's `docs/verification/<chat>.md`.
+   the result in the verification log for that change.

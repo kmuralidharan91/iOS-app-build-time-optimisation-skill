@@ -1,4 +1,4 @@
-"""Fixers for ``spm/*`` rule family (Phase A).
+"""Fixers for ``spm/*`` rule family.
 
 v1 surface: F6 (swift-syntax-not-prebuilt) and F7 (oversized-module) are
 informational. F6's actual fix is "upgrade to Xcode 26"

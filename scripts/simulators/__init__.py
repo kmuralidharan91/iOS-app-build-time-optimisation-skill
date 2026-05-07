@@ -1,4 +1,4 @@
-"""Predictor registry + dataclasses for ios-build-simulate (Phase A).
+"""Predictor registry + dataclasses for ios-build-simulate.
 
 Each predictor module under this package exposes a single ``predict(findings,
 context)`` entry point per rule_id. The orchestrator in ``scripts/simulate.py``
@@ -8,7 +8,7 @@ measurement.json + project context), then for each rule_id present in
 findings sharing that rule_id, collects the resulting ``RulePrediction``
 records, ranks them by total predicted Δ, and serialises the artifact.
 
-Per-rule aggregation (Phase A contract):
+Per-rule aggregation contract:
 
 - A predictor consumes ALL findings sharing its rule_id and returns ONE
   ``RulePrediction``. This is intentional — when a single fix (e.g. enabling
@@ -27,7 +27,7 @@ from typing import Any, Literal
 
 
 PredictionMethod = Literal[
-    "measured-on-REDACTED",
+    "measured-on-private-corpus",
     "measured-on-wikipedia",
     "heuristic",
     "literature",
@@ -122,12 +122,12 @@ def _median_seconds_for(
     measurement: dict[str, Any] | None,
     build_type: str,
 ) -> float | None:
-    """Pull median wall-clock for ``build_type`` from a Phase A measurement.json.
+    """Pull median wall-clock for ``build_type`` from a measurement.json.
 
-    Phase A schema: ``summary.<build_type>.median_seconds`` is the
-    canonical location. ``runs.<build_type>`` is a list of per-repeat
-    records (used by other consumers); the median lives in summary.
-    Returns None if either layer is missing.
+    Schema: ``summary.<build_type>.median_seconds`` is the canonical
+    location. ``runs.<build_type>`` is a list of per-repeat records
+    (used by other consumers); the median lives in summary. Returns
+    None if either layer is missing.
     """
 
     if not measurement:
@@ -143,7 +143,7 @@ def _median_seconds_for(
 def baseline_clean_seconds_from_measurement(
     measurement: dict[str, Any] | None,
 ) -> float | None:
-    """Pull the median clean-build wall-clock from a Phase A measurement.json."""
+    """Pull the median clean-build wall-clock from a measurement.json."""
 
     return _median_seconds_for(measurement, "clean")
 
@@ -151,6 +151,6 @@ def baseline_clean_seconds_from_measurement(
 def baseline_incremental_seconds_from_measurement(
     measurement: dict[str, Any] | None,
 ) -> float | None:
-    """Pull the median incremental-build wall-clock from a Phase A measurement.json."""
+    """Pull the median incremental-build wall-clock from a measurement.json."""
 
     return _median_seconds_for(measurement, "incremental")

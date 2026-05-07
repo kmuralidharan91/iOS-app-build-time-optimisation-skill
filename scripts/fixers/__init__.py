@@ -1,4 +1,4 @@
-"""Fixer registry + dataclasses for ios-build-fix (Phase A).
+"""Fixer registry + dataclasses for ios-build-fix.
 
 Each fixer module under this package exposes ``apply(findings, ctx)`` (and
 companion ``preview`` / ``revert`` helpers) for a single rule_id. The
@@ -9,7 +9,7 @@ the post-fix benchmark, computes the actual delta, and decides
 ``outcome ∈ {success, refused-null, refused-regressive, refused-noise,
 refused-apply-error, refused-benchmark-error}``.
 
-Per-rule aggregation (Phase A contract, mirrors the simulate contract):
+Per-rule aggregation (mirrors the simulate contract):
 
 - A fixer consumes ALL findings sharing its rule_id and applies ONE
   atomic edit that closes them collectively (e.g. F3's sandbox+fuse
@@ -52,10 +52,12 @@ class AppliedFix:
 
     ``files_modified`` is repository-relative (the parent worktree's
     repo, not the submodule's). ``submodule_changes`` is non-empty when
-    the fix landed inside a submodule (e.g. F1's edit to
-    ``REDACTED/scripts/XcodeBuildSteps/Step7_RunCrashlytics.sh``).
-    The orchestrator uses these fields to write the ``applied_fix``
-    block in fix-result.json and to revert cleanly on error.
+    the fix landed inside a submodule (e.g. F1's edit to a project
+    submodule's ``scripts/<step>/<crashlytics-runner>.sh``).
+    TODO(public-cite: NetNewsWire) cite the submodule path on the
+    public-cite project. The orchestrator uses these fields to write
+    the ``applied_fix`` block in fix-result.json and to revert cleanly
+    on error.
     """
 
     kind: FixKind

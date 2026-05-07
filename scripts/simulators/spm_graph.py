@@ -17,10 +17,10 @@ from . import (
 )
 
 
-# Heuristic per-file emit cost on REDACTED (defaults.md): aggregate
-# SwiftEmitModule across modules averages ~0.05-0.1s per file. Use the
-# conservative end so a 794-file module is predicted ~40s clean impact
-# (matches Phase A estimate 39.7s).
+# Heuristic per-file emit cost (defaults.md): aggregate SwiftEmitModule
+# across modules averages ~0.05-0.1s per file. Use the conservative end
+# so a 794-file module is predicted ~40s clean impact (matches the
+# private-corpus estimate of 39.7s).
 _PER_FILE_EMIT_SECONDS_CLEAN = 0.05
 _PER_FILE_EMIT_SECONDS_INCREMENTAL = 0.04  # Per-file recompile when editing inside the module.
 
@@ -37,20 +37,20 @@ def predict_swift_syntax_not_prebuilt(
     """F6 — swift-syntax pin builds from source on clean.
 
     The Xcode 26 prebuilt-swift-syntax mechanism is documented at the
-    Xcode 26 release notes URL but was UNVERIFIED at the line level
-    until Phase A's S6a check. ``f6_verified`` is wired through the
-    registry from the orchestrator's Phase A-deferred-follow-up result.
+    Xcode 26 release notes URL. ``f6_verified`` is wired through the
+    registry from the orchestrator's deferred follow-up result.
     """
 
     if f6_verified:
         method = "literature"
         confidence = "low"
         tuning = (
-            "Xcode 26 release notes (line-level verified in Phase A S6a): "
-            "prebuilt swift-syntax mechanism + opt-in setting documented. "
-            "Predicted clean Δ heuristic 5-20s based on transitive root "
-            "(REDACTED Package.resolved swift-syntax 510.0.3, transitive via "
-            "third-party SDK using macros)."
+            "Xcode 26 release notes (line-level verified): prebuilt "
+            "swift-syntax mechanism + opt-in setting documented. "
+            "Predicted clean Δ heuristic 5-20s based on transitive root. "
+            "TODO(public-cite: Wikipedia-iOS, NetNewsWire) confirm the "
+            "project's Package.resolved pins swift-syntax (transitive via "
+            "Swift macros) and record the resolved version."
         )
         clean_pred = Prediction(
             method=method,
@@ -62,16 +62,18 @@ def predict_swift_syntax_not_prebuilt(
         )
         notes = (
             "Rule fires whenever any reachable Package.resolved pins swift-syntax.",
-            "Phase A S6a confirmed the Xcode 26 prebuilt mechanism is documented.",
+            "Xcode 26 prebuilt mechanism confirmed in release notes.",
         )
     else:
         method = "literature"
         confidence = "low"
         tuning = (
-            "REDACTED Package.resolved swift-syntax 510.0.3 (defaults.md). "
-            "Xcode 26 prebuilt-swift-syntax claim UNVERIFIED at line level "
-            "— see references/sources.md. Predicted Δ surfaced as best-effort "
-            "heuristic; Phase A S6a must confirm before Phase A fix applies."
+            "TODO(public-cite: Wikipedia-iOS, NetNewsWire) confirm the "
+            "project's Package.resolved pins swift-syntax (transitive via "
+            "Swift macros) and record the resolved version. Xcode 26 "
+            "prebuilt-swift-syntax claim UNVERIFIED at line level — see "
+            "references/sources.md. Predicted Δ surfaced as best-effort "
+            "heuristic; deferred verify must confirm before fix applies."
         )
         clean_pred = Prediction(
             method=method,
@@ -84,7 +86,7 @@ def predict_swift_syntax_not_prebuilt(
         notes = (
             "Rule fires whenever any reachable Package.resolved pins swift-syntax.",
             "F6 citation flagged UNVERIFIED in references/sources.md until "
-            "Phase A S6a confirms (or replaces with a better citation).",
+            "the deferred verify step confirms (or replaces with a better citation).",
         )
 
     incremental_pred = Prediction(
@@ -111,7 +113,7 @@ def predict_swift_syntax_not_prebuilt(
         prerequisites=(),
         applies_when=(
             "Xcode 26 toolchain available",
-            "The prebuilt-opt-in setting is documented and supported (per Phase A S6a verify)",
+            "The prebuilt-opt-in setting is documented and supported (per the deferred verify step)",
         ),
         notes=notes,
     )
@@ -133,9 +135,9 @@ def predict_oversized_module(
 
     for _idx, finding in findings:
         evidence = finding.get("evidence") or {}
-        # Evidence has the source count somewhere; Phase A spm_graph emits
-        # filesystem-walk evidence. Pull source_count from the value field
-        # (Phase A emit shape) or fall back to 200 (the threshold).
+        # Evidence has the source count somewhere; spm_graph analyzer
+        # emits filesystem-walk evidence. Pull source_count from the
+        # value field or fall back to 200 (the threshold).
         value = (evidence.get("value") or "").strip()
         source_count = 200
         # Try to parse "source_count=N" or "N .swift files" etc.
@@ -152,14 +154,15 @@ def predict_oversized_module(
     clean_estimate = -total_clean
 
     tuning = (
-        "REDACTED REDACTED module file counts (defaults.md): REDACTED=794, "
-        f"REDACTED=330. Per-file emit ~0.05s clean. Aggregated "
-        f"across {len(findings)} finding(s): "
+        "Private-corpus module file counts (defaults.md): a 794-file "
+        f"module and a 330-file module. Per-file emit ~0.05s clean. "
+        f"TODO(public-cite: Wikipedia-iOS, NetNewsWire) record per-module "
+        f".swift counts. Aggregated across {len(findings)} finding(s): "
         f"{'; '.join(per_finding_breakdown) if per_finding_breakdown else '(no findings)'}."
     )
 
     clean_pred = Prediction(
-        method="measured-on-REDACTED",
+        method="measured-on-private-corpus",
         estimate_seconds=clean_estimate,
         min_seconds=clean_estimate * 1.5,
         max_seconds=clean_estimate * 0.5,
@@ -180,9 +183,11 @@ def predict_oversized_module(
         tuning_data_point=(
             "Incremental impact is conditional on edit location: a one-line "
             "change inside a 794-file module re-emits the entire module, "
-            "potentially adding 60-120s to incremental wall-clock vs the "
-            f"~50s REDACTED touched-AppDelegate baseline. Surfaced as 0s default "
-            "with the conditional captured in applies_when."
+            "potentially adding 60-120s to incremental wall-clock vs a "
+            "~50s touched-AppDelegate baseline. TODO(public-cite: "
+            "Wikipedia-iOS, NetNewsWire) record incremental cost on a "
+            "comparable oversized module. Surfaced as 0s default with the "
+            "conditional captured in applies_when."
         ),
         notes="0s default — actual cost surfaces only when edit is inside the module.",
     )
@@ -201,8 +206,8 @@ def predict_oversized_module(
             "Module is split into 2+ smaller targets along a natural seam (feature module, layer)",
         ),
         notes=(
-            "F7 fix is multi-day refactor work; Phase A simulate flags it but "
-            "Phase A fix does NOT auto-apply. Phase A effectiveness gate "
-            "should NOT pick this rule.",
+            "F7 fix is multi-day refactor work; simulate flags it but the "
+            "fix step does NOT auto-apply. The effectiveness gate should "
+            "NOT pick this rule.",
         ),
     )

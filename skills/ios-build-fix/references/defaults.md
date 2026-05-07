@@ -3,8 +3,16 @@
 > Every threshold the analyzers use must trace back to a project + run
 > that motivated it. AGENTS.md non-negotiable principle 5: "every
 > threshold (variance, regression sensitivity, simulation rule
-> magnitude) cites the project + run that motivated it." Phase A simulate
-> tunes these on additional projects; Phase A fix re-measures.
+> magnitude) cites the project + run that motivated it."
+>
+> **Phase A (v1.0.0-rc1) status.** The thresholds below were tuned
+> against a private iOS app during development. The citations have
+> been redacted; v1.0.0 (the public release) backfills each
+> `TODO(public-cite: <project>)` marker with measurements taken
+> against a public iOS project — Wikipedia-iOS for the Tuist build
+> system, NetNewsWire for the pure-Xcode build system, Telegram-iOS
+> for the Bazel build system. Threshold *values* are not changed by
+> the citation backfill; only the evidence that justifies them.
 
 ## `script-phase/missing-output-declarations` — `outputPaths == []`
 
@@ -20,28 +28,27 @@ of `high` — the user has signalled they know the phase is not skippable,
 so the absence of outputs is less of a footgun and more an inefficiency
 they may have weighed against ergonomics.
 
-**Reference data.** REDACTED `develop` @ `REDACTED` had 14
-`PBXShellScriptBuildPhase` entries; **5** declared neither inputs nor
-outputs and ran on every build (Phase A step 22 CSV). Wikipedia iOS,
-Telegram-iOS, NetNewsWire counts to be captured in Phase A+.
+**Reference data.** TODO(public-cite: NetNewsWire) report the count of
+`PBXShellScriptBuildPhase` entries on the public iOS project, and how
+many declared neither inputs nor outputs.
 
 ## `asset-catalog/incremental-recompile` — `>= 3 seconds`
 
-Rule fires when the Phase A `measurement.json` `critical_path.incremental`
-contains a `CompileAssetCatalogVariant` node whose `duration_seconds` is
-≥ 3.0.
+Rule fires when the benchmark `measurement.json`
+`critical_path.incremental` contains a `CompileAssetCatalogVariant`
+node whose `duration_seconds` is ≥ 3.0.
 
-**Why 3 seconds.** REDACTED 4/26 baseline measured `CompileAssetCatalogVariant
-= 8.694s` on incremental Debug+sim. Phase A re-measurement on the same
-branch (post-Phase-A) measured 4.366s — still high enough that the
-finding is the user-actionable insight ("asset catalog should be cached;
-something is invalidating it on every build"). 3.0s catches both
-measurements with margin; 5.0s would have missed the Phase A number and
-under-reported the finding.
+**Why 3 seconds.** The threshold is set so that user-actionable cases
+("asset catalog should be cached; something is invalidating it on every
+build") trigger the finding while shorter runs that fall within typical
+incremental noise do not. A higher threshold (e.g. 5.0 s) would miss
+real cases where the user is paying 3–5 s per incremental for a
+recurring catalog recompile.
 
-**Reference data.** Two REDACTED runs:
-- 4/26 baseline: `8.694s` incremental (optimization-plan.md).
-- Phase A measurement (`docs/smoke/1/measurement.json`): `4.366s`.
+**Reference data.** TODO(public-cite: NetNewsWire) measure the
+`CompileAssetCatalogVariant` `duration_seconds` for incremental Debug
+builds and confirm at least one run exceeds 3.0 s. The threshold value
+is not changed by the citation backfill.
 
 ## `spm/oversized-module` — `source_count >= 200 .swift files`
 
@@ -50,21 +57,16 @@ files. Above ~200 files, single-file edits start triggering meaningfully
 larger recompile cones (a one-line change in a module re-emits that
 module, and on incremental builds the per-module emit dominates).
 
-**Reference data.** REDACTED `develop` (live checkout, 2026-05-04):
-- `REDACTED`: 794 .swift files (`high` impact tier — ≥600 files).
-- `REDACTED`: 330 .swift files.
-- `REDACTED`: 161 .swift files (under threshold).
-- `REDACTED`: 151 .swift files (under threshold).
+**Reference data.** TODO(public-cite: Wikipedia-iOS, NetNewsWire) record
+the `.swift` file count per local Package.swift module. The 200-file
+cutoff was originally tuned against a private project's modules at 794
+and 330 files (oversized cases) versus 161 and 151 files (under
+threshold); the public-cite work confirms the threshold against the
+public projects' module shapes.
 
-The 200-file cutoff comes from these four REDACTED modules: 330 and 794 are
-the ground-truth oversized cases; 161 and 151 do not appear in the
-optimization-plan.md as oversized targets. Setting the floor at 200
-captures the two targets the user already considers oversized while not
-catching the two below.
-
-**Open follow-up.** Phase A simulate adds a per-file recompile factor
-(seconds per source file in the touched module) tuned against measured
-incremental spans inside `REDACTED` vs `REDACTED`. The
+**Open follow-up.** A per-file recompile factor (seconds per source
+file in the touched module) is tuned in `scripts/simulators/spm_graph.py`
+against measured incremental spans inside oversized modules. The
 threshold itself stays at 200 unless additional projects disagree.
 
 ## `spm/swift-syntax-not-prebuilt` — pin presence
@@ -73,23 +75,20 @@ Rule fires whenever any reachable `Package.resolved` contains a pin with
 `identity == "swift-syntax"`. There is no version threshold yet; the
 existence of the pin is the trigger.
 
-**Reference data.** REDACTED `Package.resolved:382` pins `swift-syntax @
-510.0.3` (Phase A ground truth + Phase A live verify). Without xcodebuild
-project-side context, Phase A cannot tell which of REDACTED's 51 pins
-transitively imports swift-syntax — Phase A simulate adds the
-transitive-importer walk so the fix recommendation can name the package
-to talk to.
+**Reference data.** TODO(public-cite: NetNewsWire) confirm the project's
+`Package.resolved` contains a `swift-syntax` pin (transitive via Swift
+macros) and record the resolved version. The Xcode 26 prebuilt-syntax
+mechanism is verified at line level via Apple's release notes (cited in
+`references/build-optimization-sources.md`).
 
 ## `spm/branch-pinned` — `branch != null AND version == null`
 
 Rule fires only when a pin's state is `{branch: <name>, version: null}`.
-REDACTED `REDACTED` was previously branch-pinned (R1 in the Phase A
-ground truth) and is now `version=0.0.11` — the rule does **not** fire.
 
-**Reference data.** REDACTED `develop` @ `REDACTED`: zero branch-pinned
-entries (Phase A verification + Phase A live verify). If the rule ever
-fires on `REDACTED` against current develop, the verification
-log records it as a regression-of-fix, not a new finding.
+**Reference data.** TODO(public-cite: NetNewsWire) enumerate every pin
+in `Package.resolved` and confirm zero `branch != null AND version ==
+null` entries. Branch pins force a fresh fetch on every clean build and
+defeat reproducibility; the rule fires when any are present.
 
 ## `script-phase/missing-debug-guard` — heuristic keyword list
 
@@ -101,41 +100,23 @@ Rule fires when a phase (or a script the phase invokes via
 
 …AND the script body has no `CONFIGURATION` reference. This is a
 heuristic, not a hard rule: a non-upload phase that happens to mention
-"firebase" in a comment can false-positive. Per Phase A plan: emit
-`confidence` cue in the finding's `notes[]` and accept ≤1 borderline
-hit (REDACTED's `Crashlytics-Run Script` body is `${BUILD_DIR%/Build/*}/
-SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run` — borderline
-because the keyword "firebase" comes from a path, not a feature
-mention; user reviewer judges whether this is a true F2 hit).
+"firebase" in a comment can false-positive. The finding emits a
+`confidence` cue in `notes[]` and accepts ≤1 borderline hit per project
+(typical: a `firebase-ios-sdk/Crashlytics/run` invocation that triggers
+on the path-based keyword match rather than a feature mention; user
+reviewer judges whether the phase is a real upload).
 
-**Reference data.** REDACTED on `develop`:
-- `Step 7 - Run FirebaseCrashlytics` → invokes `Step7_RunCrashlytics.sh`
-  (no Debug guard) — true F2 hit.
-- `Step 8 - Upload Local dSYM` → invokes `Step8_UploadLocalDSYM.sh`
-  (no Debug guard) — true F2 hit.
-- `Crashlytics-Run Script` → invokes `firebase-ios-sdk/Crashlytics/run`
-  binary directly — borderline; guarded by Phase A simulate review.
+**Reference data.** TODO(public-cite: NetNewsWire) enumerate every
+`PBXShellScriptBuildPhase` whose body matches the keyword list, record
+which have a `CONFIGURATION` reference, and which trigger the borderline
+path-based match. The strict false-positive rate must stay below the
+20% gate.
 
-**Phase A disposition (user-confirmed via AskUserQuestion 2026-05-04).**
-The `Crashlytics-Run Script` borderline hit is accepted as a real F2
-case rather than a heuristic false positive. Reasoning: Firebase's
-`Crashlytics/run` binary uploads dSYMs on every Debug simulator build
-unless the project gates the phase via `CONFIGURATION`. The keyword
-match arrives via the SourcePackages path
-(`${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run`),
-not a feature mention in the script body, but the underlying anti-pattern
-is identical to the `.sh`-routed cases. No change to
-`scripts/analyzers/script_phase.py::_is_artifact_upload_extended` —
-the existing heuristic correctly surfaces this. Strict FP rate stays
-0/26; loose FP rate (counting this hit) stays 1/26 = 3.8%, well under
-the 20% gate. The Phase A simulate `script-phase/missing-debug-guard`
-predictor's tuning_data_point notes this disposition.
+## Simulate prediction tuning data points
 
-## Phase A simulate prediction tuning data points
-
-Phase A (`ios-build-simulate`) builds a per-rule prediction function on
-top of the Phase A finding-level `wall_clock_predicted_seconds` block.
-Each predictor cites a tuning data point on both clean and incremental
+`ios-build-simulate` builds a per-rule prediction function on top of
+the diagnose finding's `wall_clock_predicted_seconds` block. Each
+predictor cites a tuning data point on both clean and incremental
 axes per AGENTS.md non-negotiable principle 5. The tuning points are
 encoded in the predictor source under
 [`scripts/simulators/`](../scripts/simulators/) and reproduced here as
@@ -143,14 +124,14 @@ the human-facing table.
 
 | rule_id | tuning data point (clean) | tuning data point (incremental) |
 | --- | --- | --- |
-| `script-phase/random-sleep` | REDACTED REDACTED `Step7_RunCrashlytics.sh:13` `sleep $[ ( $RANDOM % 10 ) + 1 ]s` → mean 5.5s, range 1–10s | same — sleep runs unconditionally on every build |
-| `script-phase/missing-debug-guard` | REDACTED 4/26 baseline incremental: Step7+Step8 combined ~3s; 1.5s per finding aggregated | same — guard fires regardless of clean/incremental |
-| `script-phase/missing-output-declarations` | REDACTED REDACTED step-22 CSV; per-phase 4s ±1; sum capped at sqrt(N)×4 to model post-sandbox+fuse parallel fan-out | same shape; cap applies symmetrically |
-| `script-phase/swiftlint-on-build` | REDACTED Step1_SwiftLintCheck heuristic: clean ~3s, incremental ~2s (1–6 range) | REDACTED heuristic: ~2s per finding |
-| `build-setting/compilation-cache-disabled` | REDACTED Phase D measurement: 45.6% on warm-cache clean (~125s on 275s baseline); when measurement.json supplies a project baseline, prediction scales accordingly | REDACTED Phase D measured ~10s incremental regression cost (positive value = regression) |
-| `build-setting/eager-linking-disabled` | REDACTED Phase v1→v2 measurement: zero clean improvement; predicted 0s ±8 to surface the low-confidence shape; Phase A fix re-measure must refuse on null delta | 0s ±0 — eager linking affects scheduling, not incremental wall-clock |
+| `script-phase/random-sleep` | TODO(public-cite: NetNewsWire) measure a typical `sleep $RANDOM` invocation and capture mean + range; expected mean ~5.5 s, range 1–10 s for a `sleep $(( RANDOM % 10 ))` pattern | same — sleep runs unconditionally on every build |
+| `script-phase/missing-debug-guard` | TODO(public-cite: NetNewsWire) measure incremental cost of unguarded artifact-upload phases; expected ~1.5 s per finding aggregated | same — guard fires regardless of clean/incremental |
+| `script-phase/missing-output-declarations` | TODO(public-cite: NetNewsWire) measure per-phase wall-clock cost; expected ~4 s ±1; sum capped at `sqrt(N)×4` to model post-sandbox+fuse parallel fan-out | same shape; cap applies symmetrically |
+| `script-phase/swiftlint-on-build` | TODO(public-cite: NetNewsWire) measure SwiftLint build-phase wall-clock; expected ~3 s clean, ~2 s incremental (1–6 range) | TODO(public-cite: NetNewsWire) ~2 s per finding |
+| `build-setting/compilation-cache-disabled` | TODO(public-cite: NetNewsWire) measure warm-cache clean improvement; expected ~45 % on a baseline that does not yet enable `COMPILATION_CACHE_ENABLE_CACHING`. When `measurement.json` supplies a project baseline, prediction scales to that baseline | TODO(public-cite: NetNewsWire) measure incremental regression cost; expected ~10 s positive (regression) |
+| `build-setting/eager-linking-disabled` | TODO(public-cite: NetNewsWire) measure clean improvement; expected near-zero with ±8 s spread to surface low confidence; the fixer must refuse on null delta | 0 s ±0 — eager linking affects scheduling, not incremental wall-clock |
 | `build-setting/script-sandboxing-disabled` (PR-#2) | WWDC22 110364: indirect; estimate=null; wins materialise via `FUSE_BUILD_SCRIPT_PHASES` once enabled | same |
-| `build-setting/fuse-build-script-phases-disabled` (PR-#2) | WWDC22 110364: heuristic 0.5s clean / 0.4s incremental per phase × REDACTED 14-phase count → ~7s clean / ~5.6s incremental | same — heuristic, project-shape sensitive |
-| `asset-catalog/incremental-recompile` | F5 is incremental-only — predicted 0s clean (asset catalog always compiles cold) | REDACTED Phase A `measurement.json` `incremental.critical_path.nodes` `CompileAssetCatalogVariant`=4.366s; predictor uses literal node duration when supplied, else falls back to that reference |
-| `spm/swift-syntax-not-prebuilt` | REDACTED Package.resolved swift-syntax 510.0.3 (transitive); Xcode 26 prebuilt mechanism line-level verified by Phase A S6a; predicted -12s ±7s clean | 0s — F6 is a clean-build finding; swift-syntax compiles once |
-| `spm/oversized-module` | REDACTED REDACTED module file counts: REDACTED=794, REDACTED=330; per-file emit ~0.05s clean; 794 × 0.05 ≈ 40s matches Phase A estimate 39.7s | 0s default — incremental cost only materialises on file-level edits inside the module (captured in `applies_when`) |
+| `build-setting/fuse-build-script-phases-disabled` (PR-#2) | WWDC22 110364: heuristic 0.5 s clean / 0.4 s incremental per phase × project phase count → TODO(public-cite: NetNewsWire) record the project's phase count and resulting expected magnitude | same — heuristic, project-shape sensitive |
+| `asset-catalog/incremental-recompile` | Incremental-only — predicted 0 s clean (asset catalog always compiles cold) | TODO(public-cite: NetNewsWire) measurement.json `incremental.critical_path.nodes` `CompileAssetCatalogVariant` duration_seconds; predictor uses literal node duration when supplied, else falls back to the reference value |
+| `spm/swift-syntax-not-prebuilt` | TODO(public-cite: NetNewsWire) confirm `swift-syntax` pin and predicted clean improvement once Xcode 26's prebuilt-syntax mechanism applies; expected ~12 s ±7 | 0 s — clean-build finding; swift-syntax compiles once |
+| `spm/oversized-module` | TODO(public-cite: Wikipedia-iOS, NetNewsWire) record module file counts and per-file emit cost. Heuristic: per-file emit ~0.05 s clean; an oversized module of N files contributes ~N × 0.05 s | 0 s default — incremental cost only materialises on file-level edits inside the module (captured in `applies_when`) |

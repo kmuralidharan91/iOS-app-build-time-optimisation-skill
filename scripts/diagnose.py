@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ios-build-diagnose CLI — surface ranked findings on an iOS project.
 
-Reads on-disk project state (Xcode adapter only in v1) plus a Phase A
+Reads on-disk project state (Xcode adapter only in v1) plus a benchmark
 ``measurement.json`` and emits a JSON artifact conforming to
 ``schemas/diagnosis.schema.json``. Every finding carries a rule id,
 evidence, wall-clock impact category, and an Apple/WWDC/Tuist/Bazel
@@ -99,7 +99,7 @@ def _git_branch(project_path: pathlib.Path) -> str:
         if branch != "HEAD":
             return branch
         # Detached HEAD: fall back to a remote-tracking ref pointing at
-        # the same commit (mirrors scripts/benchmark.py Phase A fix).
+        # the same commit (mirrors scripts/benchmark.py).
         sha = _git_sha(project_path)
         if not sha:
             return ""
@@ -327,7 +327,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--scheme", default=None, help="Xcode scheme to inspect.")
     parser.add_argument(
         "--configuration", default="Debug",
-        help="Build configuration name (free string; REDACTED uses Debug or Distribution).",
+        help="Build configuration name (free string; e.g. Debug or Distribution).",
     )
     parser.add_argument(
         "--destination",
@@ -340,7 +340,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--measurement-artifact", default=None, type=pathlib.Path,
-        help="Path to a Phase A measurement.json (ios-build-measure output).",
+        help="Path to a measurement.json (ios-build-measure output).",
     )
     parser.add_argument(
         "--output-dir", required=True, type=pathlib.Path,

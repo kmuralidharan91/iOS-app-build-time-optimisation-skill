@@ -141,7 +141,7 @@ def detect_build_system(project_path: pathlib.Path) -> KnownBuildSystem:
     """Detect which build system drives the project at ``project_path``.
 
     Detection rules (per AGENTS.md, verified against current Tuist/Bazel
-    docs in Phase A):
+    docs):
 
     * **Tuist** when ``Project.swift`` exists at the project root. Tuist's
       manifest guide names this as the required manifest file

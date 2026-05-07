@@ -5,7 +5,7 @@ description: Surface ranked iOS build-time findings (script phases, build settin
 
 # `ios-build-diagnose`
 
-Reads on-disk project state plus a Phase A `measurement.json` and emits a ranked JSON artifact of findings. Each finding ties to a rule id, evidence (file:line, build-setting key, or measurement node), a wall-clock impact category, and a citation back to Apple / WWDC. Two suite value-add recommendations (sandboxing + fuse, PR-#2) ship in `additional_recommendations[]` so the F1–F9 ground-truth recall denominator stays clean.
+Reads on-disk project state plus a benchmark `measurement.json` and emits a ranked JSON artifact of findings. Each finding ties to a rule id, evidence (file:line, build-setting key, or measurement node), a wall-clock impact category, and a citation back to Apple / WWDC. Two suite value-add recommendations (sandboxing + fuse, PR-#2) ship in `additional_recommendations[]` so the F1–F9 ground-truth recall denominator stays clean.
 
 ## When to use
 
@@ -16,7 +16,7 @@ Reach for this skill when the user wants the **why** answer, not measurement and
 - "Audit this project — what's wasted time?"
 - "I have a measurement; rank the issues by impact."
 
-If the user wants the time numbers themselves, use [`ios-build-measure`](../ios-build-measure/SKILL.md). If they want a fix applied + verified, use `ios-build-fix` (Phase A). The orchestrator `ios-build-doctor` chains all three; this skill is the audit step.
+If the user wants the time numbers themselves, use [`ios-build-measure`](../ios-build-measure/SKILL.md). If they want a fix applied + verified, use `ios-build-fix`. The orchestrator `ios-build-doctor` chains all three; this skill is the audit step.
 
 ## Inputs
 
@@ -24,10 +24,10 @@ If the user wants the time numbers themselves, use [`ios-build-measure`](../ios-
 | --- | --- | --- | --- |
 | `--project-path PATH` | yes | — | Project root containing `*.xcodeproj` and/or `*.xcworkspace`. |
 | `--scheme NAME` | no | — | Required when `xcodebuild -showBuildSettings` is invoked (default flow). |
-| `--configuration NAME` | no | `Debug` | Free string. REDACTED uses `Debug` or `Distribution`. |
+| `--configuration NAME` | no | `Debug` | Free string. Some projects use `Distribution` for release-equivalent. |
 | `--destination STR` | no | `generic/platform=iOS Simulator` | Recorded into the artifact for traceability. |
 | `--platform STR` | no | `ios` | v1 enforces `ios`; v2 adds macOS / watchOS / tvOS / visionOS. |
-| `--measurement-artifact PATH` | no | — | Path to a Phase A `measurement.json`. F5 (asset-catalog/incremental-recompile) requires it. |
+| `--measurement-artifact PATH` | no | — | Path to a `measurement.json` (`ios-build-measure` output). F5 (asset-catalog/incremental-recompile) requires it. |
 | `--output-dir DIR` | yes | — | Where `diagnosis.json` is written. |
 | `--skip-xcodebuild` | no | `false` | Skip the `xcodebuild -showBuildSettings -json` call (offline / no-VPN). F4, F9, sandboxing, fuse rules short-circuit; pbxproj + SPM rules still run. |
 | `--resolved-settings-json PATH` | no | — | Pre-captured `xcodebuild -showBuildSettings -json` dump. When set, the live xcodebuild call is skipped and the dump is used instead. Useful for offline runs and pinned-baseline reproducibility. |
@@ -62,20 +62,20 @@ Top-level fields:
 
 ## Failure modes (what this skill refuses to do)
 
-- **No project mutation.** This skill never edits source files, project.pbxproj, build settings, or Package.resolved. The fix step lives in `ios-build-fix` (Phase A).
+- **No project mutation.** This skill never edits source files, project.pbxproj, build settings, or Package.resolved. The fix step lives in `ios-build-fix`.
 - **No silent fabrication when xcodebuild is unavailable.** When `xcodebuild -showBuildSettings -json` is missing / times out / returns non-JSON, the build-setting rules short-circuit and a top-level note records the limitation. F1, F2, F3, F5, F6, F7, F8 still run on pbxproj + SPM data alone.
 - **No build invocation.** This skill never runs `xcodebuild build`. Only `xcodebuild -showBuildSettings` (read-only) and stdlib filesystem reads.
 - **No platform fudge.** `--platform` other than `ios` raises `ValueError`; v2 work is additive, not retrofitted.
-- **No claims of measured impact for un-measured rules.** Each finding's `wall_clock_predicted_seconds.method` records whether the prediction is `measured-on-REDACTED` / `measured-on-wikipedia` / `heuristic` / `literature` so Phase A simulate and Phase A fix know which numbers are tunable.
+- **No claims of measured impact for un-measured rules.** Each finding's `wall_clock_predicted_seconds.method` records whether the prediction is `measured-on-private-corpus` / `measured-on-wikipedia` / `heuristic` / `literature` so simulate and fix know which numbers are tunable.
 
 ## References
 
 - Apple [Build Settings Reference](https://developer.apple.com/documentation/xcode/build-settings-reference) — F4 / F9 + PR-#2 audit citations.
-- Apple WWDC22 [Demystify parallelization in Xcode builds (110364)](https://developer.apple.com/videos/play/wwdc2022/110364/) — F1, F2, F3, F8 + PR-#2 sandboxing/fuse citations. On-disk transcript at `~/Desktop/Command+B/transcripts/xcode-build-parallelization-wwdc2022.md`; verbatim quotes in `references/build-settings-best-practices.md` are byte-identical (`grep -F` verified).
+- Apple WWDC22 [Demystify parallelization in Xcode builds (110364)](https://developer.apple.com/videos/play/wwdc2022/110364/) — F1, F2, F3, F8 + PR-#2 sandboxing/fuse citations. Verbatim quotes in `references/build-settings-best-practices.md` are verified against the session transcript.
 - Apple [`xcodebuild` man page mirror](https://keith.github.io/xcode-man-pages/xcodebuild.1.html) — `-showBuildSettings -json` flags consumed by the adapter.
 - Apple [Asset Management](https://developer.apple.com/documentation/xcode/asset-management) — F5 actool reference.
 - Apple [Swift Packages](https://developer.apple.com/documentation/xcode/swift-packages) — F7 modularisation guidance, R1 dependency-rule semantics.
-- [Tuist manifests guide](https://tuist.dev/en/docs/guides/features/projects/manifests) + [Bazel and Apple](https://bazel.build/docs/bazel-and-apple) — adapter detection logic carried over from Phase A.
+- [Tuist manifests guide](https://tuist.dev/en/docs/guides/features/projects/manifests) + [Bazel and Apple](https://bazel.build/docs/bazel-and-apple) — adapter detection logic shared with `ios-build-measure`.
 - This skill bundles its own copy of `scripts/`, `schemas/`, and `references/`. Verify drift with `python3 scripts/verify-sync.py` from the repo root.
 
 ## Citation index + thresholds
@@ -83,4 +83,4 @@ Top-level fields:
 - [`references/sources.md`](../../references/sources.md) — every URL with verification date.
 - [`references/build-settings-best-practices.md`](../../references/build-settings-best-practices.md) — Why / Recommended / Measurement / Risk for COMPILATION_CACHE_ENABLE_CACHING, EAGER_LINKING, ENABLE_USER_SCRIPT_SANDBOXING, FUSE_BUILD_SCRIPT_PHASES.
 - [`references/defaults.md`](../../references/defaults.md) — every analyzer threshold with the project + run that motivated it.
-- [`references/critical-path-method.md`](../../references/critical-path-method.md) — note added in Phase A: v1 task-class-aggregate is the formal contract; per-target DAG attribution is its own dedicated workstream.
+- [`references/critical-path-method.md`](../../references/critical-path-method.md) — v1 task-class-aggregate is the formal contract; per-target DAG attribution is its own dedicated workstream.

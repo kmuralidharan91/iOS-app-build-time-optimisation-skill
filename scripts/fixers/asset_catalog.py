@@ -1,6 +1,6 @@
-"""Fixer for ``asset-catalog/incremental-recompile`` (Phase A).
+"""Fixer for ``asset-catalog/incremental-recompile``.
 
-This rule fires when ``CompileAssetCatalogVariant`` lands on the Phase A
+This rule fires when ``CompileAssetCatalogVariant`` lands on the
 incremental critical path with duration ≥ 3 s. The fix is project-shape
 sensitive (which images invalidate, which catalog, which app-icon set);
 v1 emits a manual-followup recipe and ``no-op``-applies. The orchestrator

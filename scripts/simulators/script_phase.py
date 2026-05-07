@@ -42,9 +42,9 @@ def predict_random_sleep(
     """F1 — random sleep in script phase. Per-build cost is the sleep duration.
 
     Aggregates across hits (rare to have >1). Mean = (N+1)/2 for `$RANDOM
-    % N` (uniform 0..N-1, plus the literal `+ 1` offset REDACTED uses, giving
-    1..N inclusive → mean (N+1)/2). When the bound can't be parsed from
-    evidence.raw, default to 5s mean / 1s min / 10s max (the REDACTED literal).
+    % N` (uniform 0..N-1, plus the literal `+ 1` offset, giving 1..N
+    inclusive → mean (N+1)/2). When the bound can't be parsed from
+    evidence.raw, default to 5s mean / 1s min / 10s max.
     """
 
     total_estimate = 0.0
@@ -71,12 +71,12 @@ def predict_random_sleep(
     bounds_str = (
         f"$RANDOM%{','.join(str(b) for b in bounds_parsed)} parsed from evidence.raw"
         if bounds_parsed
-        else "$RANDOM bound unparsed; defaulted to REDACTED literal 1-10s"
+        else "$RANDOM bound unparsed; defaulted to literal 1-10s"
     )
     tuning = (
-        "REDACTED REDACTED Step7_RunCrashlytics.sh:13 "
-        "`sleep $[ ( $RANDOM % 10 ) + 1 ]s` -> mean 5.5s, range 1-10s "
-        f"({len(findings)} finding(s) aggregated; {bounds_str})"
+        "TODO(public-cite: NetNewsWire) record a representative "
+        "`sleep $[ ( $RANDOM % 10 ) + 1 ]s` invocation -> mean 5.5s, "
+        f"range 1-10s ({len(findings)} finding(s) aggregated; {bounds_str})"
     )
 
     estimate = -total_estimate
@@ -106,7 +106,7 @@ def predict_random_sleep(
         applies_when=("Sleep is removed from the script body — surgical edit, no project-shape dependency",),
         notes=(
             "Predicted Δ is the sum across findings; remove the sleep line(s) to realise it.",
-            "Lowest-risk fix in the Phase A effectiveness-gate menu (deletion of one literal line).",
+            "Lowest-risk fix in the effectiveness-gate menu (deletion of one literal line).",
         ),
     )
 
@@ -117,7 +117,7 @@ def predict_missing_debug_guard(
 ) -> RulePrediction:
     """F2 — artifact-upload phase without CONFIGURATION early-exit guard.
 
-    Per defaults.md: REDACTED 4/26 baseline shows Step7 + Step8 combined ~3s
+    Per defaults.md: aggregated artifact-upload phases combine to ~3s
     on incremental Debug+sim builds. We aggregate at 1.5s per finding
     with a +/- 0.5s envelope.
     """
@@ -127,15 +127,15 @@ def predict_missing_debug_guard(
     estimate = -per_finding * n
 
     tuning = (
-        "REDACTED 4/26 baseline incremental: Step7_RunCrashlytics.sh + "
-        f"Step8_UploadLocalDSYM.sh combined ~3s; 1.5s per finding x {n} "
+        "TODO(public-cite: NetNewsWire) measure incremental cost of "
+        f"unguarded artifact-upload phases; expected ~1.5s per finding x {n} "
         "finding(s) aggregated (one borderline path-only match expected on "
         "Crashlytics-Run Script -> firebase-ios-sdk/Crashlytics/run, "
-        "user-confirmed in Phase A as accept-as-is)"
+        "treated as accept-as-is)"
     )
 
     pred = Prediction(
-        method="measured-on-REDACTED",
+        method="measured-on-private-corpus",
         estimate_seconds=estimate,
         min_seconds=-2.0 * n,
         max_seconds=-1.0 * n,
@@ -162,7 +162,7 @@ def predict_missing_debug_guard(
         notes=(
             "Heuristic match list: firebase, crashlytics, upload, dsym, fullstory, datadog, sentry, bugsnag.",
             "Borderline path-component matches (e.g. SourcePackages/.../firebase-ios-sdk/Crashlytics/run) "
-            "are real F2 cases per Phase A user disposition — Firebase's run binary uploads dSYMs even on "
+            "are real F2 cases — Firebase's run binary uploads dSYMs even on "
             "Debug simulator builds without a guard.",
         ),
     )
@@ -174,12 +174,12 @@ def predict_missing_output_declarations(
 ) -> RulePrediction:
     """F3 — script phase declares no outputPaths.
 
-    Aggregate per-phase delta (4s ±1, measured-on-REDACTED) but cap the sum at
-    sqrt(N) * 4 to model the build system's ability to parallelise these
-    phases when sandbox + fuse are also enabled. The cap prevents a 15-hit
-    aggregate from claiming 60s of improvement when the actual REDACTED win
-    after enabling output declarations + sandbox + fuse was ~10-15s
-    incremental.
+    Aggregate per-phase delta (4s ±1, measured on private corpus) but cap
+    the sum at sqrt(N) * 4 to model the build system's ability to
+    parallelise these phases when sandbox + fuse are also enabled. The
+    cap prevents a 15-hit aggregate from claiming 60s of improvement
+    when the realistic win after enabling output declarations + sandbox
+    + fuse is ~10-15s incremental.
     """
 
     n = len(findings)
@@ -195,7 +195,8 @@ def predict_missing_output_declarations(
     )
 
     tuning = (
-        f"REDACTED REDACTED step-22 CSV: {n} phases declare no outputPaths "
+        f"TODO(public-cite: NetNewsWire) record the project's phase count: "
+        f"{n} phases declare no outputPaths "
         f"({high_impact_count} alwaysOutOfDate=False -> high impact). "
         f"Per-phase 4s ±1 (defaults.md script-phase/missing-output-declarations); "
         f"sum capped at sqrt({n}) * 4 = {capped:.1f}s to model parallel fan-out "
@@ -203,7 +204,7 @@ def predict_missing_output_declarations(
     )
 
     pred = Prediction(
-        method="measured-on-REDACTED",
+        method="measured-on-private-corpus",
         estimate_seconds=estimate,
         min_seconds=-capped * 1.25,
         max_seconds=-capped * 0.5,
@@ -252,10 +253,11 @@ def predict_swiftlint_on_build(
     estimate_cln = -3.0 * n
 
     tuning = (
-        f"REDACTED REDACTED Step1_SwiftLintCheck heuristic: 1-6s per phase x "
-        f"{n} hit(s); incremental mean 2s, clean mean 3s. Phase "
-        "blocks the compile pipeline for its full duration; pre-commit "
-        "hook + editor-on-save recovers the time without losing enforcement."
+        f"TODO(public-cite: NetNewsWire) measure SwiftLint build-phase "
+        f"wall-clock heuristic: 1-6s per phase x {n} hit(s); incremental "
+        "mean 2s, clean mean 3s. Phase blocks the compile pipeline for "
+        "its full duration; pre-commit hook + editor-on-save recovers "
+        "the time without losing enforcement."
     )
 
     clean_pred = Prediction(

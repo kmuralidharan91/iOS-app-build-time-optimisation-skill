@@ -6,6 +6,12 @@ Rules covered:
 - ``build-setting/eager-linking-disabled``             — F9 (finding)
 - ``build-setting/script-sandboxing-disabled``         — PR-#2 recommendation
 - ``build-setting/fuse-build-script-phases-disabled``  — PR-#2 recommendation
+
+Phase A (v1.0.0-rc1) status: thresholds and ratios below were tuned
+against a private iOS app during development. v1.0.0 (the public
+release) backfills these against measurements taken on a public iOS
+project; threshold values are not changed by the citation backfill,
+only the evidence that justifies them. See ``references/defaults.md``.
 """
 
 from __future__ import annotations
@@ -19,8 +25,14 @@ from . import (
 )
 
 
-_NSK_REFERENCE_CLEAN_SECONDS = 275.0  # 4/26 baseline (defaults.md)
-_NSK_PHASE_D_REDUCTION = 0.456
+# Reference baseline used when the user's own measurement.json doesn't
+# supply a clean-build median; tuned against a private iOS app during
+# Phase A. Re-tune in Phase B against the public-cite project.
+_REFERENCE_CLEAN_SECONDS = 275.0
+# Compilation-cache warm-cache reduction ratio: clean-build improvement
+# observed when COMPILATION_CACHE_ENABLE_CACHING flips from NO to YES,
+# expressed as a fraction of the cold-cache baseline.
+_COMPILATION_CACHE_WARM_REDUCTION = 0.456
 
 
 def _indices(findings: list[tuple[int, dict[str, Any]]]) -> tuple[int, ...]:
@@ -33,18 +45,21 @@ def predict_compilation_cache_disabled(
 ) -> RulePrediction:
     """F4 — COMPILATION_CACHE_ENABLE_CACHING is unset / NO.
 
-    clean Δ = -0.456 * baseline_clean (REDACTED Phase D measurement); when no
-    measurement.json baseline is available, fall back to the REDACTED 4/26
-    reference 275s -> -125s.
+    clean Δ = -0.456 * baseline_clean (warm-cache reduction observed
+    against a private iOS app, TODO(public-cite: NetNewsWire) confirm
+    against the public-cite project). When the user supplies a
+    measurement.json baseline the prediction scales to it; otherwise
+    falls back to ``_REFERENCE_CLEAN_SECONDS``.
 
-    incremental Δ = +10s (regression cost; REDACTED Phase D measured this).
+    incremental Δ = +10s (regression cost; cache invalidation cone is
+    wider than Xcode's incremental tracker).
     """
 
-    baseline = ctx.baseline_clean_seconds or _NSK_REFERENCE_CLEAN_SECONDS
-    clean_estimate = -_NSK_PHASE_D_REDUCTION * baseline
+    baseline = ctx.baseline_clean_seconds or _REFERENCE_CLEAN_SECONDS
+    clean_estimate = -_COMPILATION_CACHE_WARM_REDUCTION * baseline
     using_measurement = ctx.baseline_clean_seconds is not None
 
-    method = "measured-on-REDACTED"
+    method = "measured-on-private-corpus"
     confidence = "high" if using_measurement else "medium"
 
     clean_pred = Prediction(
@@ -53,10 +68,11 @@ def predict_compilation_cache_disabled(
         min_seconds=-baseline * 0.55,
         max_seconds=-baseline * 0.30,
         tuning_data_point=(
-            "REDACTED Phase D measurement: warm-cache clean Debug+sim build "
-            "came in 45.6% faster than cold-cache equivalent (~125s saved "
-            f"on a 275s baseline). Applied here against baseline = {baseline:.1f}s "
-            f"({'measurement.json clean median' if using_measurement else 'REDACTED 4/26 reference fallback'})."
+            "Warm-cache clean Debug+sim build came in 45.6% faster than "
+            "cold-cache equivalent (~125s saved on a 275s baseline) on "
+            "the Phase-A private corpus. TODO(public-cite: NetNewsWire) "
+            f"confirm magnitude. Applied here against baseline = {baseline:.1f}s "
+            f"({'measurement.json clean median' if using_measurement else 'Phase-A reference fallback'})."
         ),
         notes=(
             "Warm cache only — first build after enabling populates the "
@@ -64,16 +80,16 @@ def predict_compilation_cache_disabled(
         ),
     )
     incremental_pred = Prediction(
-        method="measured-on-REDACTED",
+        method="measured-on-private-corpus",
         estimate_seconds=10.0,
         min_seconds=5.0,
         max_seconds=15.0,
         tuning_data_point=(
-            "REDACTED Phase D incremental: ~10s extra on touched-file change "
-            "because cache invalidation cone is wider than Xcode's "
-            "incremental tracker."
+            "~10s extra on touched-file change because cache invalidation "
+            "cone is wider than Xcode's incremental tracker. "
+            "TODO(public-cite: NetNewsWire) confirm magnitude."
         ),
-        notes="Positive value = regression. Net positive on every REDACTED measurement so far.",
+        notes="Positive value = regression. Net positive on every Phase-A measurement so far.",
     )
 
     return RulePrediction(
@@ -86,14 +102,14 @@ def predict_compilation_cache_disabled(
         confidence=confidence,
         prerequisites=(),
         applies_when=(
-            "Warm cache; first build after enabling primes the cache (~5-8 min on REDACTED)",
+            "Warm cache; first build after enabling primes the cache (~5-8 min on a sizeable project)",
             "Project tolerates the ~10s incremental regression",
         ),
         notes=(
             "Trade-off explicitly surfaced — incremental cost is real and can be "
             "the deciding factor for projects whose dev loop is incremental-dominated.",
             "Net wall-clock impact (clean+incremental) is project-dependent; "
-            "Phase A fix re-measures both before declaring success.",
+            "the fixer re-measures both before declaring success.",
         ),
     )
 
@@ -104,21 +120,22 @@ def predict_eager_linking_disabled(
 ) -> RulePrediction:
     """F9 — EAGER_LINKING is unset / NO.
 
-    REDACTED Phase v1->v2 measured zero clean improvement and the change was
-    reverted. Predict 0s ±8 with low confidence; Phase A fix re-measure
-    must refuse on null delta.
+    Phase-A measurement against a private iOS app showed zero clean
+    improvement and the change was reverted. Predict 0s ±8 with low
+    confidence; the fixer re-measure must refuse on null delta.
+    TODO(public-cite: NetNewsWire) confirm magnitude.
     """
 
     pred = Prediction(
-        method="measured-on-REDACTED",
+        method="measured-on-private-corpus",
         estimate_seconds=0.0,
         min_seconds=-8.0,
         max_seconds=0.0,
         tuning_data_point=(
-            "REDACTED Phase v1->v2 measurement: zero clean-build improvement; "
-            "change was reverted in optimization-plan.md. Per defaults.md, "
-            "F9 surfaces as low-confidence; simulate predicts 0s and Phase A "
-            "fix re-measure refuses on null delta."
+            "Phase-A measurement: zero clean-build improvement; the change "
+            "was reverted. Per defaults.md, F9 surfaces as low-confidence; "
+            "simulate predicts 0s and the fixer re-measure refuses on null "
+            "delta. TODO(public-cite: NetNewsWire) confirm magnitude."
         ),
         notes=(
             "Project-shape sensitive — eager linking only helps projects "
@@ -127,7 +144,7 @@ def predict_eager_linking_disabled(
         ),
     )
     no_op = Prediction(
-        method="measured-on-REDACTED",
+        method="measured-on-private-corpus",
         estimate_seconds=0.0,
         min_seconds=0.0,
         max_seconds=0.0,
@@ -152,7 +169,7 @@ def predict_eager_linking_disabled(
             "dynamic frameworks linked by their dependents)",
         ),
         notes=(
-            "Surface but prepare for null-delta. Phase A fix re-measure refuses "
+            "Surface but prepare for null-delta. The fixer re-measure refuses "
             "to claim success when the actual improvement is null/regressive — "
             "test the refusal path here.",
         ),
@@ -204,9 +221,16 @@ def predict_script_sandboxing_disabled(
         ),
         notes=(
             "Suite value-add (PR-#2 audit); not part of the F1-F9 ground truth.",
-            "Apply target-by-target; Phase A fix carries the per-finding refusal-when-broken guarantee.",
+            "Apply target-by-target; the fixer carries the per-finding refusal-when-broken guarantee.",
         ),
     )
+
+
+# Reference phase count used when the user's project doesn't supply one;
+# tuned against a private iOS app during Phase A. The fuse heuristic
+# scales linearly with phase count, so accuracy depends on the
+# downstream caller passing the real count.
+_REFERENCE_SCRIPT_PHASE_COUNT = 14
 
 
 def predict_fuse_build_script_phases_disabled(
@@ -216,19 +240,19 @@ def predict_fuse_build_script_phases_disabled(
     """PR-#2 — FUSE_BUILD_SCRIPT_PHASES is unset / NO.
 
     Heuristic: ~0.5s saved per script phase (shell-startup amortisation)
-    once preconditions are met. REDACTED has 14 script phases on develop ->
-    ~7s clean / ~5s incremental savings.
+    once preconditions are met. TODO(public-cite: NetNewsWire) confirm
+    project's phase count and resulting magnitude.
     """
 
-    n_phases = 14  # REDACTED REDACTED step-22 CSV count; future projects re-tune.
+    n_phases = _REFERENCE_SCRIPT_PHASE_COUNT
     clean_estimate = -0.5 * n_phases
     incremental_estimate = -0.4 * n_phases
 
     tuning = (
-        f"WWDC22 110364: fusing {n_phases} script phases (REDACTED REDACTED "
-        "step-22 CSV) amortises shell-startup overhead across the chain. "
-        "Heuristic 0.5s clean / 0.4s incremental per phase; project-shape "
-        "sensitive."
+        f"WWDC22 110364: fusing {n_phases} script phases (Phase-A "
+        "reference count, TODO(public-cite: NetNewsWire) confirm) "
+        "amortises shell-startup overhead across the chain. Heuristic "
+        "0.5s clean / 0.4s incremental per phase; project-shape sensitive."
     )
 
     clean_pred = Prediction(

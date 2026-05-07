@@ -2,7 +2,7 @@
 
 A suite of [Claude Code Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) that benchmark, diagnose, simulate, and fix iOS build-time problems across **Xcode**, **Tuist**, and **Bazel** projects.
 
-> **Status — v0 (in development).** Phase A ships skeleton + ground-truth baseline. Chats 1–6 implement the skills. v1.0.0 ships once the doctor full-loop gate passes on the smoke-test corpus.
+> **Status — v0 (in development).** v1.0.0 ships once the doctor full-loop gate passes on the smoke-test corpus.
 
 ## The 5 skills
 
@@ -20,7 +20,7 @@ Decomposed by **user intent**, not by Xcode build-system technology layer.
 
 1. **Multi-build-system** — Xcode (primary), Tuist, Bazel via internal adapter pattern. Same diagnostics, three backends.
 2. **Wall-clock attribution** — `critical_path.py` walks the build-timing DAG so findings are ranked by what *actually* prolongs the build, not cumulative compile aggregates.
-3. **Real-project-tested defaults** — every threshold and heuristic is backed by runs against Wikipedia iOS / REDACTED / Telegram-iOS / NetNewsWire / LifeInUK. See `references/defaults.md` (added in Phase A).
+3. **Real-project-tested defaults** — every threshold and heuristic is backed by runs against public iOS projects (Wikipedia iOS / Telegram-iOS / NetNewsWire). See `references/defaults.md`.
 4. **Cross-run regression history** — `.build-history/` JSON-flat per-project DB keyed by git SHA; flags regressions over a sliding window.
 5. **What-if impact simulation** — predicted Δ wall-clock per finding, labelled as prediction not measurement, with predicted-vs-actual reporting after each applied fix.
 
@@ -29,7 +29,7 @@ Decomposed by **user intent**, not by Xcode build-system technology layer.
 > Quickstart commands will be filled in once the skills ship in chats 1–5. Until then this section is a placeholder.
 
 ```bash
-# Install (placeholder — finalised after sync strategy lands in Phase A/6):
+# Install (placeholder):
 git clone https://github.com/kmuralidharan91/iOS-app-build-time-optimisation-skill ~/repos/ios-build-skills
 cp -R ~/repos/ios-build-skills/skills/* ~/.claude/skills/
 
@@ -49,7 +49,7 @@ cd /path/to/your/ios-project
 ├── LICENSE                       # MIT, (c) 2026 Muralidharan Kathiresan
 ├── README.md                     # This file
 ├── AGENTS.md                     # Engineering principles + sync strategy + verify-sync.py contract
-├── CHECKS.md                     # Developer-facing summary of every diagnose check (populated in Phase A)
+├── CHECKS.md                     # Developer-facing summary of every diagnose check
 ├── scripts/                      # Canonical scripts (synced into each skill — see AGENTS.md)
 │   ├── adapters/                 # xcode / tuist / bazel
 │   ├── benchmark.py              # ios-build-measure
@@ -68,14 +68,14 @@ cd /path/to/your/ios-project
 │   ├── ios-build-simulate/{...}
 │   └── ios-build-fix/{...}
 └── docs/
-    ├── PLAN.md                   # Canonical execution plan (post-Phase A)
+    ├── PLAN.md                   # Canonical execution plan
     ├── PROGRESS.md               # Append-only TodoWrite mirror
     ├── baseline/                 # Hand-authored ground truth per smoke target
     ├── smoke/<chat-N>/           # Per-chat smoke-test outputs
     └── verification/<chat-N>.md  # Per-chat clean-room verification log
 ```
 
-Each `skills/<name>/` directory is self-contained, matching the [canonical anthropics/skills layout](https://github.com/anthropics/skills/tree/main/skills/pdf). Sync from canonical roots is enforced by `scripts/verify-sync.py` (added when the canonical scripts ship in Phase A).
+Each `skills/<name>/` directory is self-contained, matching the [canonical anthropics/skills layout](https://github.com/anthropics/skills/tree/main/skills/pdf). Sync from canonical roots is enforced by `scripts/verify-sync.py`.
 
 ## License
 

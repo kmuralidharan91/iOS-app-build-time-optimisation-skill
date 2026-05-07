@@ -9,11 +9,12 @@ artifact. Each task class is reported as one node ranked by duration;
 
 Per-target attribution and a true dependency-DAG walk would need to
 parse the 14000+ ActivityLogCommandInvocationSection entries inside
-the ``.xcresult`` bundle (verified against the Phase A baseline
-2026-05-04: xcresulttool 24757, schema 0.1.0, 14865 top-level command
-invocations on a single Build action — not grouped by target). That
-work is deferred to Phase A alongside the diagnose pass, which already
-needs to walk per-target build settings and script phases.
+the ``.xcresult`` bundle (verified against a Phase-A baseline:
+xcresulttool 24757, schema 0.1.0, ~14865 top-level command
+invocations on a single Build action — not grouped by target).
+TODO(public-cite: NetNewsWire) reproduce the count on the public-cite
+project. That work is deferred alongside the diagnose pass, which
+already needs to walk per-target build settings and script phases.
 
 Two parsing inputs are accepted, in order of preference:
 
@@ -153,7 +154,7 @@ def derive_critical_path(
     notes.append(
         "method=task-class-aggregate: nodes are xcodebuild task classes "
         "ranked by total wall-clock; per-target DAG attribution deferred "
-        "to Phase A (ios-build-diagnose) — see references/critical-path-method.md"
+        "to ios-build-diagnose — see references/critical-path-method.md"
     )
     notes.append(f"timing summary source: {source}")
 

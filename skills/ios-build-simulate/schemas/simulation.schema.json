@@ -91,7 +91,7 @@
         "method": {
           "type": "string",
           "enum": [
-            "measured-on-REDACTED",
+            "measured-on-private-corpus",
             "measured-on-wikipedia",
             "heuristic",
             "literature"
@@ -103,7 +103,7 @@
         "tuning_data_point": {
           "type": "string",
           "minLength": 1,
-          "description": "Required: project + run that motivated this prediction (AGENTS.md principle 5). E.g. 'REDACTED REDACTED Step7_RunCrashlytics.sh:13: sleep $[ ($RANDOM % 10) + 1 ]s -> mean 5.5s'."
+          "description": "Required: project + run that motivated this prediction (AGENTS.md principle 5). E.g. 'Step7_RunCrashlytics.sh: sleep $[ ($RANDOM % 10) + 1 ]s -> mean 5.5s'."
         },
         "notes": { "type": ["string", "null"] }
       }

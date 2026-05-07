@@ -7,8 +7,8 @@
 1. **Recommend-first, never-mutate-without-approval.** No skill modifies the user's project before showing the proposed change and getting explicit approval. `ios-build-fix` is the only skill that touches project files, and only after `ios-build-doctor` (or the user directly) has approved a specific finding. Approval is per-finding, not per-batch.
 2. **Wall-clock is the primary metric.** Findings ranked by predicted Δ wall-clock impact, not by cumulative compile time, not by file size, not by alphabetical order. If a finding can't be tied to a wall-clock category (`high` ≥ 30s, `medium` 5–30s, `low` < 5s, `unknown`), it's not shipped. Wall-clock attribution comes from `scripts/critical_path.py`'s DAG walk, not from `xcodebuild -showBuildTimingSummary`'s cumulative aggregates.
 3. **Questionnaire first.** `ios-build-doctor` opens with the 8-question structured questionnaire before any analysis runs. Other skills can run standalone, but the doctor is the canonical UX.
-4. **Cite Apple/WWDC/Tuist/Bazel for every recommendation.** Every diagnose finding includes a citation to a primary source (`developer.apple.com`, WWDC session, `docs.tuist.dev`, `bazel.build`). Citations live in `references/sources.md` (added in Phase A). No hand-wavy "this should be faster" reasoning.
-5. **Real-project-tested defaults only.** Every threshold (variance, regression sensitivity, simulation rule magnitude) cites the project + run that motivated it. References in `references/defaults.md` (added in Phase A).
+4. **Cite Apple/WWDC/Tuist/Bazel for every recommendation.** Every diagnose finding includes a citation to a primary source (`developer.apple.com`, WWDC session, `docs.tuist.dev`, `bazel.build`). Citations live in `references/sources.md`. No hand-wavy "this should be faster" reasoning.
+5. **Real-project-tested defaults only.** Every threshold (variance, regression sensitivity, simulation rule magnitude) cites the project + run that motivated it. References in `references/defaults.md`.
 6. **Honesty about predictions.** Output from `ios-build-simulate` is always labelled "predicted Δ", not "Δ". `ios-build-fix` reports a predicted-vs-actual delta after every fix and refuses to claim success on a null or regressive measurement (within the variance threshold).
 
 ## Platform scope (v1)
@@ -43,11 +43,11 @@ def package_graph(project_path: pathlib.Path,
                   platform: Literal["ios"]) -> PackageGraph: ...
 ```
 
-Fix application is **not** an adapter responsibility in v1.0.0. The Phase A design moved it out of the adapter surface into per-rule fixer modules orchestrated by a single CLI: see [`scripts/fixers/registry.py`](scripts/fixers/registry.py) for the registered fixer modules (script-phase / build-setting / asset-catalog / spm-graph) and [`scripts/fix.py`](scripts/fix.py) for the orchestrator that builds a throwaway branch, applies the approved patch, re-measures, and refuses on null/regressive deltas. The Xcode adapter is the v1.0.0-must-ship target. Tuist + Bazel adapters ship measurement parts in v1.0.0; full diagnose for non-Xcode systems is deferred to v1.0.1+.
+Fix application is **not** an adapter responsibility in v1.0.0. The fix-step design lives outside the adapter surface in per-rule fixer modules orchestrated by a single CLI: see [`scripts/fixers/registry.py`](scripts/fixers/registry.py) for the registered fixer modules (script-phase / build-setting / asset-catalog / spm-graph) and [`scripts/fix.py`](scripts/fix.py) for the orchestrator that builds a throwaway branch, applies the approved patch, re-measures, and refuses on null/regressive deltas. The Xcode adapter is the v1.0.0-must-ship target. Tuist + Bazel adapters ship measurement parts in v1.0.0; full diagnose for non-Xcode systems is deferred to v1.0.1+.
 
 ## Sync strategy — chosen: byte-identical copies + verify-sync.py
 
-**Decision.** Each `skills/<name>/` directory contains its own copies of the canonical scripts, schemas, and references it needs. A `scripts/verify-sync.py` gate (lands in Phase A) compares each skill copy to the canonical version under repo root and exits non-zero on drift. Run as a pre-commit hook locally and as a CI gate when the repo flips public.
+**Decision.** Each `skills/<name>/` directory contains its own copies of the canonical scripts, schemas, and references it needs. A `scripts/verify-sync.py` gate compares each skill copy to the canonical version under repo root and exits non-zero on drift. Run as a pre-commit hook locally and as a CI gate when the repo flips public.
 
 **Why this over the alternatives:**
 
@@ -57,7 +57,7 @@ Fix application is **not** an adapter responsibility in v1.0.0. The Phase A desi
 | Single-source design (skill dirs hold only `SKILL.md`, paths point to repo-root canonical) | No duplication | Breaks the [Anthropic Skills loader convention](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) where each `skills/<name>/` is self-contained; users can't install one skill, only the entire repo | Rejected |
 | **Byte-identical copies + verify-sync.py** | Each skill self-contained, matches canonical anthropics/skills layout (e.g. [`pdf`](https://github.com/anthropics/skills/tree/main/skills/pdf), [`skill-creator`](https://github.com/anthropics/skills/tree/main/skills/skill-creator)); users can copy one skill into `~/.claude/skills/` and it works standalone | Storage duplication (negligible — KB scale); needs a sync gate to prevent drift | **Chosen** |
 
-`verify-sync.py` (drafted in Phase A) computes a SHA-256 of every canonical file under `scripts/`, `schemas/`, `references/`, then for each `skills/<name>/{scripts,schemas,references}/<file>` compares the SHA. Mismatches print the diff and exit 1.
+`verify-sync.py` computes a SHA-256 of every canonical file under `scripts/`, `schemas/`, `references/`, then for each `skills/<name>/{scripts,schemas,references}/<file>` compares the SHA. Mismatches print the diff and exit 1.
 
 ## Per-skill `SKILL.md` style guide
 
@@ -69,11 +69,11 @@ Fix application is **not** an adapter responsibility in v1.0.0. The Phase A desi
 
 ## Smoke-test corpus and effectiveness gates
 
-Every chat that produces a user-visible script smokes against `~/REDACTED/` on the **`develop`** branch. The doctor full-loop also smokes against `~/Downloads/wikipedia-ios` for multi-build-system parity. See [`docs/PLAN.md`](docs/PLAN.md) "Effectiveness gate" for the per-chat numeric gates.
+Each user-visible script is smoke-tested against a private iOS corpus during development; the public release backfills the same gates against public corpora — Wikipedia-iOS for the Tuist build system, NetNewsWire for the pure-Xcode build system, Telegram-iOS for the Bazel build system. See [`docs/PLAN.md`](docs/PLAN.md) "Effectiveness gate" for the per-skill numeric gates.
 
 ## Clean-room posture
 
-This is original work, not a derivative. No file in this repo is allowed to share a 30-character substring with any non-frontmatter content from `~/Documents/Xcode-Build-Optimization-Agent-Skill/`. Each chat ends with a clean-room verification log under `docs/verification/<chat-N>.md` that proves zero matches.
+This is original work, not a derivative. Each multi-file change ends with a clean-room verification log that proves zero textual overlap with any earlier prior-art codebase used during exploration.
 
 ## Commit + push protocol
 

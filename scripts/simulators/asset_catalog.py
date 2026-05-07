@@ -21,10 +21,10 @@ def _indices(findings: list[tuple[int, dict[str, Any]]]) -> tuple[int, ...]:
 
 
 def _critical_path_node_seconds(measurement: dict[str, Any] | None) -> float | None:
-    """Pull CompileAssetCatalogVariant duration from Phase A measurement.json.
+    """Pull CompileAssetCatalogVariant duration from measurement.json.
 
     Tolerates both shapes the diagnose analyzer also accepts:
-    - Phase A schema: ``{dominant_task, duration_seconds}``
+    - benchmark schema: ``{dominant_task, duration_seconds}``
     - hypothetical xcresult-target-graph future: ``{class_name, total_seconds}``
     """
 
@@ -58,30 +58,32 @@ def predict_incremental_recompile(
 
     if measured is not None:
         incremental_estimate = -measured
-        method = "measured-on-REDACTED"
+        method = "measured-on-private-corpus"
         confidence = "high"
         tuning = (
-            "Phase A measurement.json incremental.critical_path.nodes "
-            f"CompileAssetCatalogVariant = {measured:.3f}s (REDACTED REDACTED, "
-            "touched-AppDelegate.swift incremental). Predicted Δ is the "
-            "literal node duration — fixing the upstream input (e.g. "
-            "Step6_resetXCAssets RESET_RESOURCES guard) recovers it."
+            "measurement.json incremental.critical_path.nodes "
+            f"CompileAssetCatalogVariant = {measured:.3f}s "
+            "(touched-AppDelegate.swift incremental). Predicted Δ is the "
+            "literal node duration — fixing the upstream input (e.g. a "
+            "script phase that resets asset-catalog inputs every build) "
+            "recovers it. TODO(public-cite: NetNewsWire) confirm magnitude."
         )
         notes_text = (
             f"measurement.json supplied; node duration {measured:.3f}s used directly."
         )
     else:
-        # Fall back to defaults.md REDACTED 4/26 baseline = 8.694s.
+        # Fall back to defaults.md reference baseline.
         incremental_estimate = -4.366
-        method = "measured-on-REDACTED"
+        method = "measured-on-private-corpus"
         confidence = "medium"
         tuning = (
-            "No measurement.json supplied; defaulting to Phase A REDACTED REDACTED "
+            "No measurement.json supplied; defaulting to private-corpus "
             "incremental measurement 4.366s (defaults.md "
-            "asset-catalog/incremental-recompile)."
+            "asset-catalog/incremental-recompile). "
+            "TODO(public-cite: NetNewsWire) confirm magnitude."
         )
         notes_text = (
-            "Fallback to REDACTED reference data — supply --measurement-artifact "
+            "Fallback to private-corpus reference data — supply --measurement-artifact "
             "for project-specific prediction."
         )
 
@@ -95,7 +97,7 @@ def predict_incremental_recompile(
     )
 
     clean_pred = Prediction(
-        method="measured-on-REDACTED",
+        method="measured-on-private-corpus",
         estimate_seconds=0.0,
         min_seconds=0.0,
         max_seconds=0.0,
@@ -104,7 +106,7 @@ def predict_incremental_recompile(
             "compile the asset catalog, so there is no clean-build savings "
             "from fixing the incremental invalidation cause."
         ),
-        notes="Surface 0 explicitly so Phase A fix doesn't claim clean improvement on F5.",
+        notes="Surface 0 explicitly so the fix step doesn't claim clean improvement on F5.",
     )
 
     return RulePrediction(
@@ -119,12 +121,12 @@ def predict_incremental_recompile(
         applies_when=(
             "An upstream input (likely a script phase that touches asset files) is "
             "modifying asset-catalog inputs on every build — locate and gate it",
-            "On REDACTED specifically: Step6_resetXCAssets is the documented root cause "
-            "(per optimization-plan.md Phase B Backtrace investigation)",
+            "TODO(public-cite: NetNewsWire) document the equivalent root-cause "
+            "script phase if the public project exhibits the same pattern",
         ),
         notes=(
             "F5 fix is about identifying the upstream invalidator, not making "
             "actool faster. The wall-clock recovery equals the node duration "
-            "in the Phase A measurement.",
+            "in the supplied measurement.",
         ),
     )

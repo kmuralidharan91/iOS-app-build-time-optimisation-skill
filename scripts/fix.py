@@ -1,4 +1,4 @@
-"""ios-build-fix orchestrator (Phase A).
+"""ios-build-fix orchestrator.
 
 Apply a single approved finding from ios-build-diagnose to an Xcode
 project on a throwaway branch, re-measure with ios-build-measure, report
@@ -337,7 +337,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--variance-threshold-pct", type=float,
         default=DEFAULT_VARIANCE_PCT,
         help=(
-            f"Default {DEFAULT_VARIANCE_PCT}%% (matches Phase A measure-gate "
+            f"Default {DEFAULT_VARIANCE_PCT}%% (matches the measure-gate "
             "spec). |delta| below this percent of baseline_median is "
             "classified as noise."
         ),
@@ -407,10 +407,10 @@ def _find_git_root(path: pathlib.Path) -> pathlib.Path | None:
     ``.git`` (either a directory for a normal repo, or a file for a
     git worktree link). Returns the discovered root or None.
 
-    REDACTED's layout puts the .xcodeproj inside ``REDACTED/`` but
-    the worktree's ``.git`` file is at ``/private/tmp/REDACTED-develop-Phase A/.git`` —
-    so a fix.py invocation pointing project_root at the .xcodeproj dir
-    must locate the git root one level up.
+    Some projects nest the .xcodeproj inside a subdirectory while the
+    worktree's ``.git`` file lives at the parent — so a fix.py
+    invocation pointing project_root at the .xcodeproj dir must locate
+    the git root one level up.
     """
 
     candidate = path
@@ -434,7 +434,7 @@ def _ensure_branch(project_root: pathlib.Path, branch: str) -> None:
     """Create + check out the throwaway branch from current HEAD.
 
     Verifies the resulting state rather than trusting the git exit
-    code, because some projects' ``post-checkout`` hooks (e.g. REDACTED's
+    code, because some projects' ``post-checkout`` hooks (e.g. a
     GitFlow-name enforcer) exit non-zero with only a warning and we
     don't want that to crash the orchestrator. If after the checkout
     HEAD points at the requested branch, the call is treated as a

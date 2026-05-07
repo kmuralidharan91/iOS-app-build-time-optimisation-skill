@@ -1,4 +1,4 @@
-"""Fixers for the ``build-setting/*`` rule family (Phase A).
+"""Fixers for the ``build-setting/*`` rule family.
 
 Auto-applicable in v1: F4 (compilation-cache-disabled), F9
 (eager-linking-disabled — designed null-delta refusal-path test). PR-#2's
@@ -20,13 +20,11 @@ from . import AppliedFix, ApplyError, FixContext, SubmoduleChange
 
 # F4 + F9 share the same Debug-xcconfig target; reuse the F3 helper.
 def _debug_xcconfig(project_root: pathlib.Path) -> pathlib.Path:
+    # TODO(public-cite: NetNewsWire) confirm the canonical xcconfig
+    # layout for the public-cite project and add additional candidates
+    # here. v1 supports a Configurations/Project/Local/local-debug.xcconfig
+    # layout; the fix refuses cleanly when no candidate matches.
     candidates = [
-        project_root
-        / "REDACTED"
-        / "Configurations"
-        / "Project"
-        / "Local"
-        / "local-debug.xcconfig",
         project_root / "Configurations" / "Project" / "Local" / "local-debug.xcconfig",
     ]
     for candidate in candidates:
@@ -34,7 +32,8 @@ def _debug_xcconfig(project_root: pathlib.Path) -> pathlib.Path:
             return candidate
     raise ApplyError(
         "build-setting fixer: could not locate local-debug.xcconfig under "
-        "project root. v1 supports the REDACTED layout only."
+        "project root. v1 supports the Configurations/Project/Local "
+        "xcconfig layout only."
     )
 
 
@@ -75,7 +74,7 @@ def preview_eager_linking_disabled(
     return (
         f"F9 eager-linking-disabled — set in {xcconfig.relative_to(ctx.project_root)}:\n"
         "  + EAGER_LINKING = YES\n"
-        "(Predicted Δ 0.0s on REDACTED; designed null-delta refusal-path test.)"
+        "(Predicted Δ 0.0s on the private corpus; designed null-delta refusal-path test.)"
     )
 
 

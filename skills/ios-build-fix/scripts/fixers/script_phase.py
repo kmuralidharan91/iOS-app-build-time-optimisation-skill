@@ -1,4 +1,4 @@
-"""Fixers for the ``script-phase/*`` rule family (Phase A).
+"""Fixers for the ``script-phase/*`` rule family.
 
 Auto-applicable in v1: F1 (random-sleep), F3 (missing-output-declarations
 via ENABLE_USER_SCRIPT_SANDBOXING + FUSE_BUILD_SCRIPT_PHASES). F2 and F8
@@ -120,13 +120,15 @@ def preview_missing_output_declarations(
 
     v1 only enables ``FUSE_BUILD_SCRIPT_PHASES``; the companion
     ``ENABLE_USER_SCRIPT_SANDBOXING`` requires every existing script
-    phase to declare its inputs/outputs and breaks REDACTED's "Step 4 - Copy
-    Localizable Resources..." (and similar) until those declarations
-    land. Empirically validated 2026-05-04: enabling both together on
-    REDACTED ``develop`` @ ``REDACTED`` produces ``** BUILD FAILED **`` with
-    sandbox-denied PhaseScriptExecution. Predicted impact drops from
-    -15.5s combined (sandbox+fuse) to roughly the PR-#2 fuse-only band
-    of -7s clean / -5.6s incremental.
+    phase to declare its inputs/outputs and breaks the project's
+    existing script-phase layout (resource-copy phases, codegen phases,
+    etc.) until those declarations land. Empirically validated against
+    a private iOS app during Phase A: enabling both together produces
+    ``** BUILD FAILED **`` with sandbox-denied PhaseScriptExecution.
+    TODO(public-cite: NetNewsWire) reproduce the failure mode on the
+    public-cite project. Predicted impact drops from -15.5s combined
+    (sandbox+fuse) to roughly the PR-#2 fuse-only band of -7s clean /
+    -5.6s incremental.
     """
 
     xcconfig = _f3_xcconfig_target(ctx.project_root)
@@ -150,9 +152,11 @@ def apply_missing_output_declarations(
 
     v1 deliberately scopes the F3 fix to fuse-only. Sandbox + outputPaths
     is a v1.x enhancement (requires per-phase pbxproj edits). Empirically
-    validated 2026-05-04 against REDACTED develop @ REDACTED: sandbox ON
-    without outputPaths breaks "Step 4 - Copy Localizable Resources"
+    validated against a private iOS app during Phase A: sandbox ON
+    without outputPaths breaks the project's resource-copy script phases
     with sandbox-denied PhaseScriptExecution → ** BUILD FAILED **.
+    TODO(public-cite: NetNewsWire) reproduce the failure mode on the
+    public-cite project.
     """
 
     xcconfig = _f3_xcconfig_target(ctx.project_root)
@@ -183,8 +187,9 @@ def apply_missing_output_declarations(
         [rel],
         "F3: enable FUSE_BUILD_SCRIPT_PHASES (fuse-only; sandbox deferred)\n\n"
         "Closes diagnose findings rule_id=script-phase/missing-output-declarations.\n"
-        "Sandbox NOT enabled — would break REDACTED's Step 4 phase until outputPaths "
-        "are declared per script phase (pbxproj edit, deferred to v1.x).",
+        "Sandbox NOT enabled — would break existing resource-copy script phases "
+        "until outputPaths are declared per script phase (pbxproj edit, "
+        "deferred to v1.x).",
         no_verify=ctx.no_verify_commits,
     )
     submodule_changes = _detect_submodule_changes(ctx.project_root, [rel])
@@ -293,7 +298,7 @@ def _resolve_finding_path(project_root: pathlib.Path, raw: str) -> pathlib.Path 
     """Resolve a diagnose-recorded path against the project root.
 
     Diagnose can record an absolute path (e.g.
-    ``/private/tmp/REDACTED-develop-Phase A/...``) that points to a worktree
+    ``/private/tmp/<your-worktree>/...``) that points to a worktree
     that no longer exists. We try in order: as-is, basename under
     project_root recursively, then None.
     """
@@ -358,20 +363,17 @@ def _delete_random_sleep_line(
 def _f3_xcconfig_target(project_root: pathlib.Path) -> pathlib.Path:
     """Return the Debug xcconfig that should receive F3's settings.
 
-    REDACTED convention: ``REDACTED/Configurations/Project/Local/local-debug.xcconfig``
-    is the live Debug xcconfig (referenced as
+    v1 convention: a ``Configurations/Project/Local/local-debug.xcconfig``
+    layout is expected to be the live Debug xcconfig (referenced as
     ``baseConfigurationReference`` for the Debug configuration in the
-    main pbxproj). This fixer is REDACTED-shaped for v1; future projects need
-    a discovery pass via ``xcodebuild -showBuildSettings``.
+    main pbxproj). This fixer assumes the conventional
+    Configurations/Local layout for v1; future projects need a discovery
+    pass via ``xcodebuild -showBuildSettings``.
+    TODO(public-cite: NetNewsWire) extend the candidate list once
+    project shapes diverge from the convention.
     """
 
     candidates = [
-        project_root
-        / "REDACTED"
-        / "Configurations"
-        / "Project"
-        / "Local"
-        / "local-debug.xcconfig",
         project_root / "Configurations" / "Project" / "Local" / "local-debug.xcconfig",
     ]
     for candidate in candidates:
@@ -379,8 +381,9 @@ def _f3_xcconfig_target(project_root: pathlib.Path) -> pathlib.Path:
             return candidate
     raise ApplyError(
         "F3: could not locate local-debug.xcconfig under project root. "
-        "v1 supports the REDACTED layout only; extend _f3_xcconfig_target() for "
-        "other projects."
+        "v1 supports the conventional Configurations/Local layout; "
+        "TODO(public-cite: NetNewsWire) extend the candidate list once "
+        "project shapes diverge."
     )
 
 

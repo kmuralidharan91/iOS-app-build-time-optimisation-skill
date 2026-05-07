@@ -8,13 +8,13 @@ Reads ``DiagnosisContext.package_graph`` (a ``PackageGraph`` from
   prebuilt swift-syntax that macro-using projects can opt into.
 - ``spm/oversized-module`` (F7) — fires when a local Package.swift
   module under the project tree has ≥ 200 .swift files (default; see
-  references/defaults.md). REDACTED's REDACTED @ 794 + REDACTED-
-  ios @ 330 are the reference points.
+  references/defaults.md). The threshold was tuned against private-
+  corpus modules at 794 and 330 files; TODO(public-cite: Wikipedia-
+  iOS, NetNewsWire) confirm against the public projects' module shapes.
 - ``spm/branch-pinned`` (R1 suppression) — only fires when a pin has
-  a ``branch`` set AND no ``version``. R1 (REDACTED) was
-  resolved to ``version=0.0.11`` so this rule should NOT surface
-  against current develop; if it does, the verification log records
-  it as a false positive.
+  a ``branch`` set AND no ``version``. The rule should NOT surface
+  against well-maintained projects; when it does, the verification
+  log records it as a false positive.
 """
 
 from __future__ import annotations
@@ -83,8 +83,8 @@ def _check_swift_syntax(graph) -> list[Finding]:
                     "and is one of the top contributors to clean-build cost "
                     "in projects that use Swift macros transitively. The "
                     "exact magnitude depends on the project size and the "
-                    "transitive importer; Phase A simulate refines this on "
-                    "Wikipedia / NetNewsWire."
+                    "transitive importer; simulate refines this against "
+                    "Wikipedia-iOS / NetNewsWire."
                 ),
             ),
             citation=Citation(
@@ -123,16 +123,18 @@ def _check_oversized_modules(graph) -> list[Finding]:
                 ),
                 impact_category=impact,
                 wall_clock_predicted=WallClockPrediction(
-                    method="measured-on-REDACTED",
+                    method="measured-on-private-corpus",
                     estimate_seconds=float(module.source_count) * 0.05,
                     min_seconds=10.0,
                     max_seconds=120.0,
                     notes=(
                         "Coarse heuristic: oversized modules force more "
                         "files to recompile per touched file. Real impact "
-                        "depends on the call graph; Phase A simulate tunes "
-                        "the per-file factor against measured incremental "
-                        "spans inside the module."
+                        "depends on the call graph; simulate tunes the "
+                        "per-file factor against measured incremental "
+                        "spans inside the module. TODO(public-cite: "
+                        "Wikipedia-iOS, NetNewsWire) record per-module "
+                        "incremental cost on a comparable oversized module."
                     ),
                 ),
                 citation=Citation(

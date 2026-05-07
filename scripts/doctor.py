@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ios-build-doctor orchestrator (Phase A).
+"""ios-build-doctor orchestrator.
 
 Drive the four prior skills end-to-end:
 
@@ -142,9 +142,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--auto-approve-fix", action="store_true",
         help="Forwarded as --auto-approve to fix.py.")
     parser.add_argument("--allow-manual", action="store_true",
-        help="Always forwarded to fix.py regardless of picked rule (per "
-             "Phase A plan decision: manual rules go through fix.py for "
-             "tuning-data consistency).")
+        help="Always forwarded to fix.py regardless of picked rule "
+             "(manual rules go through fix.py for tuning-data consistency).")
     parser.add_argument("--rule-id", default=None,
         help="Skip the top-N approval prompt and pre-pick this rule.")
     parser.add_argument("--non-interactive", action="store_true",
@@ -156,8 +155,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--worktree-seed-ref", default="develop",
         help="git ref to seed the throwaway worktree from (default: 'develop'). "
              "Use 'origin/develop' on hosts whose local develop branch is stale "
-             "vs. the upstream pin (e.g. REDACTED Phase A/1/2/3/4 ground truth at "
-             "origin/develop=REDACTED).")
+             "vs. the upstream pin.")
     parser.add_argument("--no-verify-commits", action="store_true",
         help="Forwarded to fix.py for projects whose hooks gate on branch-name "
              "or ticket-name patterns rather than correctness.")
@@ -468,10 +466,10 @@ def _setup_worktree(
     branch_seed: str = "develop",
 ) -> pathlib.Path:
     stamp = _utc_stamp()
-    target = ctx.worktree_base / f"REDACTED-doctor-{stamp}"
+    target = ctx.worktree_base / f"ios-build-doctor-{stamp}"
     if target.exists():
-        # Extremely unlikely (UTC-second resolution + REDACTED-doctor prefix).
-        # Bail out rather than clobber.
+        # Extremely unlikely (UTC-second resolution + ios-build-doctor
+        # prefix). Bail out rather than clobber.
         raise RuntimeError(f"worktree path already exists: {target}")
 
     print(f"[doctor.py] worktree add {target} from {git_root} ({branch_seed})")
@@ -479,8 +477,8 @@ def _setup_worktree(
         "git", "-C", str(git_root),
         "worktree", "add", "--detach", str(target), branch_seed,
     ])
-    # Mirror Phase A fix.py._ensure_branch: foreign post-checkout hooks (e.g.
-    # REDACTED's Swift-macro-trust + GitFlow-name checks) can return non-zero
+    # Mirror fix.py._ensure_branch: foreign post-checkout hooks (e.g.
+    # Swift-macro-trust + GitFlow-name checks) can return non-zero
     # while the worktree itself is fully created. Verify by post-condition
     # rather than trusting git's exit code.
     if rc != 0:
@@ -493,7 +491,7 @@ def _setup_worktree(
             file=sys.stderr,
         )
 
-    # Best-effort submodule init for projects like REDACTED.
+    # Best-effort submodule init for projects with submodules.
     submodule_rc = subprocess.call(
         ["git", "-C", str(target), "submodule", "update", "--init", "--recursive"],
     )
@@ -575,14 +573,14 @@ def _run_fix(
         "--scheme", ctx.scheme,
         "--configuration", ctx.configuration,
         "--destination", ctx.destination,
-        # Doctor always forwards these three; per Phase A plan:
+        # Doctor always forwards these three:
         "--auto-approve",      # double-prompt avoidance
         "--allow-refusal",     # refused-* is honest-PASS for the demo
         "--allow-manual",      # manual rules go through fix.py for tuning data
     ]
-    # Forward the worktree-translated touch-file (Phase A D.6) so
-    # fix.py's post-fix benchmark mtime-touches a file inside the
-    # throwaway worktree, not the primary checkout.
+    # Forward the worktree-translated touch-file so fix.py's post-fix
+    # benchmark mtime-touches a file inside the throwaway worktree, not
+    # the primary checkout.
     fix_touch = touch_file_for_fix if touch_file_for_fix is not None else ctx.touch_file
     if "incremental" in ctx.build_types and fix_touch is not None:
         cmd.extend(["--touch-file", str(fix_touch)])
@@ -996,20 +994,20 @@ def main(argv: list[str] | None = None) -> int:
     # Translate the user's --project-path (relative to git_root) into the
     # equivalent path inside the throwaway worktree so fix.py's
     # --project-root points at the *.xcodeproj directory, not the worktree
-    # root. For REDACTED, project_path = ~/REDACTED/REDACTED,
-    # git_root = ~/REDACTED, rel = REDACTED,
-    # worktree = /tmp/REDACTED-doctor-<ts>, worktree_project = /tmp/.../REDACTED.
+    # root. Example: project_path = ~/repo/AppDir,
+    # git_root = ~/repo, rel = AppDir,
+    # worktree = /tmp/ios-build-doctor-<ts>, worktree_project = /tmp/.../AppDir.
     try:
         rel = ctx.project_path.relative_to(git_root)
     except ValueError:
         rel = pathlib.Path(".")
     worktree_project = (worktree / rel).resolve() if str(rel) not in ("", ".") else worktree
 
-    # Phase A D.6 — translate ctx.touch_file the same way so fix.py's
-    # post-fix mtime touch hits the throwaway worktree's working copy,
-    # not the primary checkout. F4's clean-axis gate is unaffected by
-    # the prior Phase A confound, but the incremental axis was; this
-    # patch makes the incremental measurement well-defined.
+    # Translate ctx.touch_file the same way so fix.py's post-fix mtime
+    # touch hits the throwaway worktree's working copy, not the primary
+    # checkout. The clean-axis gate is unaffected by the prior confound,
+    # but the incremental axis was; this patch makes the incremental
+    # measurement well-defined.
     worktree_touch_file: pathlib.Path | None
     if ctx.touch_file is not None:
         try:

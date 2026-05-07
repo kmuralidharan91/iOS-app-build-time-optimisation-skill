@@ -24,8 +24,8 @@
 | `script-phase/swiftlint-on-build` | script-phase | Phase name + body + invoked-script body | Regex `\bswiftlint\b` match | low | [WWDC22 110364](https://developer.apple.com/videos/play/wwdc2022/110364/) |
 | `build-setting/compilation-cache-disabled` | build-setting | `xcodebuild -showBuildSettings` resolved value of `COMPILATION_CACHE_ENABLE_CACHING` (PR-#1 effective-settings semantics) | resolved value ≠ `YES` | high | [Apple Build Settings Reference](https://developer.apple.com/documentation/xcode/build-settings-reference) |
 | `build-setting/eager-linking-disabled` | build-setting | `xcodebuild -showBuildSettings` resolved value of `EAGER_LINKING` | resolved value ≠ `YES` | low | [Apple Build Settings Reference](https://developer.apple.com/documentation/xcode/build-settings-reference) |
-| `asset-catalog/incremental-recompile` | asset-catalog | Phase A `measurement.json` `critical_path.incremental.nodes` | `CompileAssetCatalogVariant` `duration_seconds` ≥ 3.0 (tolerates both `dominant_task`/`duration_seconds` and `class_name`/`total_seconds` field shapes) | medium / high | [Apple Asset Management](https://developer.apple.com/documentation/xcode/asset-management) |
-| `spm/swift-syntax-not-prebuilt` | spm | Every reachable `Package.resolved` | A pin's `identity == "swift-syntax"` exists | medium | [Xcode 26 release notes](https://developer.apple.com/documentation/xcode-release-notes/xcode-26-release-notes) — prebuilt-swift-syntax claim **UNVERIFIED at line level until Phase A confirms** |
+| `asset-catalog/incremental-recompile` | asset-catalog | Benchmark `measurement.json` `critical_path.incremental.nodes` | `CompileAssetCatalogVariant` `duration_seconds` ≥ 3.0 (tolerates both `dominant_task`/`duration_seconds` and `class_name`/`total_seconds` field shapes) | medium / high | [Apple Asset Management](https://developer.apple.com/documentation/xcode/asset-management) |
+| `spm/swift-syntax-not-prebuilt` | spm | Every reachable `Package.resolved` | A pin's `identity == "swift-syntax"` exists | medium | [Xcode 26 release notes](https://developer.apple.com/documentation/xcode-release-notes/xcode-26-release-notes) — prebuilt-swift-syntax claim **UNVERIFIED at line level until the deferred verify confirms** |
 | `spm/oversized-module` | spm | Every local `Package.swift` with a `*.swift` source-file count per module | `source_count ≥ 200` (high tier ≥ 600; medium tier ≥ 200) | high / medium | [Apple Swift Packages](https://developer.apple.com/documentation/xcode/swift-packages) |
 
 ## `additional_recommendations[]` rules (PR-#2 audit; counted separately so the F1–F9 recall denominator stays unambiguous)
@@ -39,22 +39,22 @@
 
 | Rule id | What | Suppressed when |
 | --- | --- | --- |
-| `spm/branch-pinned` | Package pinned by branch instead of version | Pin's `version != null` (R1 in the Phase A ground truth — `REDACTED` is now `version=0.0.11`, so the rule does **not** fire and surfacing it would count as a false positive against the Phase A effectiveness gate) |
+| `spm/branch-pinned` | Package pinned by branch instead of version | Pin's `version != null` (the rule does **not** fire when every pin already resolves to a tagged version; surfacing it in that case would count as a false positive against the diagnose effectiveness gate) |
 
 ## Coverage boundaries
 
 - **Adapter coverage**: v1 ships diagnose only on the Xcode adapter. The Tuist + Bazel adapter `script_phases`, `package_graph`, `show_build_settings` calls raise `NotImplementedError`. Diagnose for those build systems lands in v1.x.
 - **Platform coverage**: v1 fences `platform="ios"`. Other platforms are accepted by the questionnaire but rejected with a "v2 not yet" error.
-- **Critical-path inference**: see [`references/critical-path-method.md`](references/critical-path-method.md) — v1 uses `task-class-aggregate`, NOT a per-target DAG walk. Diagnose's asset-catalog rule reads the Phase A emit shape; per-target DAG attribution is its own deferred workstream.
+- **Critical-path inference**: see [`references/critical-path-method.md`](references/critical-path-method.md) — v1 uses `task-class-aggregate`, NOT a per-target DAG walk. Diagnose's asset-catalog rule reads the benchmark emit shape; per-target DAG attribution is its own deferred workstream.
 
 ## Sources of truth
 
-- [`references/build-settings-best-practices.md`](references/build-settings-best-practices.md) — Why / Recommended / Measurement / Risk for every build-setting rule (incl. WWDC22 110364 verbatim quotes, single-line block-quote form so `grep -F` byte-identity holds against the on-disk transcript at `~/Desktop/Command+B/transcripts/xcode-build-parallelization-wwdc2022.md`).
+- [`references/build-settings-best-practices.md`](references/build-settings-best-practices.md) — Why / Recommended / Measurement / Risk for every build-setting rule (incl. WWDC22 110364 verbatim quotes, verified verbatim against the session transcript).
 - [`references/sources.md`](references/sources.md) — every citation URL with verification date.
-- [`references/defaults.md`](references/defaults.md) — every threshold + heuristic tied to its REDACTED reference data point (the project + run that motivated it).
+- [`references/defaults.md`](references/defaults.md) — every threshold + heuristic tied to a `TODO(public-cite: <project>)` marker that names the project the threshold's evidence will be backfilled against.
 - [`scripts/analyzers/`](scripts/analyzers/) — the actual rule implementations (`script_phase.py`, `build_setting.py`, `asset_catalog.py`, `spm_graph.py`, plus the `Finding`/`Recommendation` dataclasses in `__init__.py`).
 - [`schemas/diagnosis.schema.json`](schemas/diagnosis.schema.json) — Draft 2020-12 schema (v1.0.0) every diagnose artifact validates against.
 
-## Phase A additions (simulation predictors)
+## Simulation predictors
 
-When Phase A ships, this file gains a "Simulation predictors" section listing each rule's prediction function under [`scripts/simulators/`](scripts/simulators/) with its tuning data point (the project + run that motivated the predicted Δ wall-clock). Until then, the static `wall_clock_predicted_seconds` block on each finding is the canonical predicted-Δ source.
+Per-rule predictors live under [`scripts/simulators/`](scripts/simulators/); each one carries a tuning data point (the project + run that motivated the predicted Δ wall-clock). The static `wall_clock_predicted_seconds` block on each diagnose finding is the canonical predicted-Δ source until the simulate step refines it.
