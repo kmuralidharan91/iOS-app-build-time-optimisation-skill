@@ -51,7 +51,7 @@
 
 - [`references/build-settings-best-practices.md`](references/build-settings-best-practices.md) — Why / Recommended / Measurement / Risk for every build-setting rule (incl. WWDC22 110364 verbatim quotes, verified verbatim against the session transcript).
 - [`references/sources.md`](references/sources.md) — every citation URL with verification date.
-- [`references/defaults.md`](references/defaults.md) — every threshold + heuristic tied to a `TODO(public-cite: <project>)` marker that names the project the threshold's evidence will be backfilled against.
+- [`references/defaults.md`](references/defaults.md) — every threshold + heuristic with its v1.0.0 evidence citation (Wikipedia-iOS@`9200297c15` and/or NetNewsWire@`build-comparison-base`); items deferred to v1.1 are explicitly annotated `(deferred to v1.1 — <reason>)`.
 - [`scripts/analyzers/`](scripts/analyzers/) — the actual rule implementations (`script_phase.py`, `build_setting.py`, `asset_catalog.py`, `spm_graph.py`, plus the `Finding`/`Recommendation` dataclasses in `__init__.py`).
 - [`schemas/diagnosis.schema.json`](schemas/diagnosis.schema.json) — Draft 2020-12 schema (v1.0.0) every diagnose artifact validates against.
 

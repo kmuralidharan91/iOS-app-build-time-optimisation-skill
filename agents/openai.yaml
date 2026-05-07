@@ -1,5 +1,5 @@
 name: ios-build-skills
-version: "1.0.0-rc1"
+version: "1.0.0"
 description: >
   iOS build-time optimisation skills: benchmark, diagnose, simulate, and fix
   Xcode/Tuist/Bazel projects. Recommend-first; never mutates the user's

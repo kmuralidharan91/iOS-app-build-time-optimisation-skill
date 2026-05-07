@@ -2,7 +2,7 @@
 
 A suite of [Agent Skills](https://agentskills.io) that benchmark, diagnose, simulate, and fix iOS build-time problems across **Xcode**, **Tuist**, and **Bazel** projects. Works in Claude Code, Cursor, GitHub Copilot, OpenAI Codex, and Windsurf — anywhere the [Agent Skills open standard](https://agentskills.io/specification) is supported.
 
-> **Status — v1.0.0-rc1 (release candidate).** Skills, schemas, and predictors are complete and self-contained. Per-rule magnitude calibrations are tagged `TODO(public-cite: <project>)` in `references/defaults.md` and the simulator source; v1.0.0 backfills those citations against measurements on public iOS projects (Wikipedia-iOS for Tuist, NetNewsWire for pure Xcode, Telegram-iOS for Bazel). Threshold *values* will not change between rc1 and 1.0.0 — only the evidence that justifies them.
+> **Status — v1.0.0.** Per-rule magnitude calibrations cite measured runs on [Wikipedia-iOS](https://github.com/wikimedia/wikipedia-ios) at commit `9200297c15` (pure Xcode `Wikipedia` and `Experimental` schemes; plus a Tuist-migration POC at `113cbb6f26`) and [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire) at the same Phase B baseline (pure Xcode second data point + the F3/F4/F9 fix-apply target). Bazel adapter ships with qualitative-only evidence in v1.0.0 (the Wikipedia-iOS Bazel POC is paused at the WMFData `apple_core_data_model` blocker; see `references/defaults.md`); measured Bazel numbers ship in v1.x. Threshold *values* did not change between rc1 and v1.0.0 — only the evidence that justifies them. A small set of rules ship with explicit `(deferred to v1.1)` annotations: F1 (no triggering pattern observed in either corpus), F2 measured Δ (informational manual recipe in v1.0.0), F6 magnitude (neither corpus pulls swift-syntax).
 
 ## The 5 skills
 
@@ -72,28 +72,35 @@ Drop `skills/<name>/` into `.windsurf/skills/` at your project root, or into `~/
 
 ## Sample run
 
+The doctor's actual transcript on Wikipedia-iOS@`9200297c15` (Experimental scheme, iPhone 17 simulator, Xcode 26.4.1):
+
 ```text
 > use ios-build-doctor on this project
 
 [ios-build-doctor]
-  Detected build system: Xcode
-  Running benchmark.py --repeats 5 …
-    clean median: 89.8 s   (variance 4.2 %)
-    incremental median: 27.7 s   (variance 6.8 %)
+  Detected build system: Xcode (Wikipedia.xcodeproj)
+  Running benchmark.py --repeats 3 …
+    clean median: 85.4 s   (variance 2.7 %)
+    incremental median: 14.9 s  (variance 32 %, flagged for re-run)
   Running diagnose.py …
-    F1 script-phase/random-sleep        — high impact   (predicted -5.5 s clean)
-    F4 build-setting/compilation-cache  — high impact   (predicted ~45 % clean improvement)
-    F8 script-phase/swiftlint-on-build  — low impact    (predicted -2 s incremental)
+    F8 script-phase/swiftlint-on-build  — high impact   (3× SwiftLint phases; 5.82 s incremental = 39 % of wall-clock)
+    F4 build-setting/compilation-cache  — high impact   (COMPILATION_CACHE_ENABLE_CACHING unset; predicted ~45 % clean win)
+    F3 script-phase/missing-output-decls — high impact  (5/6 phases alwaysOutOfDate; predicted -7 s clean / -5.6 s incremental fuse-only)
+    F7 spm/oversized-module             — medium impact (WMFComponents=213 files, just over 200 threshold)
+    F5 asset-catalog/incremental-recompile — informational (4 catalogs, 53.86 s clean cost)
+    F9 build-setting/eager-linking-disabled — low impact (designed null-delta refusal-path test)
   Top recommendation: F4 (warm-cache compilation cache).
-  Apply F4 fix? [y/N]
-> y
-  Applied F4. Re-running benchmark.py --repeats 5 …
-    clean median: 49.7 s   (Δ -40.1 s, -44.7 %)
-    incremental median: 30.8 s  (Δ +3.1 s — within predicted regression band)
-  Verdict: F4 passed the predicted-vs-actual gate. Net wall-clock improvement.
 ```
 
-The numbers above illustrate the doctor's output shape; live numbers are project-dependent. See `OPTIMIZATION-CHECKS.md` for the full set of rules and citations.
+Per-rule citation evidence is in [`references/defaults.md`](references/defaults.md). v1.0.0 includes the F3 / F4 / F9 fix-apply pass on NetNewsWire — all three honestly **refused to claim success** because the variance noise on a 28-second baseline exceeds the predicted-win magnitude:
+
+| Rule | Outcome | Clean Δ | Incremental Δ |
+| --- | --- | ---: | ---: |
+| F3 (`script-phase/missing-output-declarations`, fuse-only) | `refused-regressive` | +6.31 s | +2.92 s |
+| F4 (`build-setting/compilation-cache-disabled`) | `refused-noise` | −1.32 s (within variance) | +10.86 s (expected regression) |
+| F9 (`build-setting/eager-linking-disabled`, designed null-delta) | `refused-regressive` | +3.47 s | +2.06 s |
+
+Source artefacts: [`build-benchmarks/netnewswire/fix-F3/fix-result.json`](build-benchmarks/netnewswire/fix-F3/fix-result.json), [`fix-F4/fix-result.json`](build-benchmarks/netnewswire/fix-F4/fix-result.json), [`fix-F9/fix-result.json`](build-benchmarks/netnewswire/fix-F9/fix-result.json). The refusals are evidence that the fixer's "refuse-on-noise / refuse-on-regression" gate works as designed — these fixes have known wins on larger projects (the development-time corpus + the Wikipedia-iOS pure-Xcode 89.838 s clean baseline confirm the rule applies) but lack the magnitude headroom to detect them on a 28-second baseline. See [`CHECKS.md`](CHECKS.md) for the full set of rules and citations.
 
 ## Side-effects warning — `ios-build-fix`
 
