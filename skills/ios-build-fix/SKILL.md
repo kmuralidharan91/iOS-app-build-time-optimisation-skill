@@ -111,7 +111,7 @@ Top-level fields of `fix-result.json` (full schema in `schemas/fix-result.schema
 | `spm/swift-syntax-not-prebuilt` (F6) | ✗ | `no-op` | "Upgrade to Xcode 26" — manual recipe. |
 | `spm/oversized-module` (F7) | ✗ | `no-op` | Module-split is architectural; recipe only. |
 
-The xcconfig lookup is in `scripts/fixers/{script_phase,build_setting}.py::_*xcconfig*` and extends to other layouts by adding candidate paths. TODO(public-cite: NetNewsWire) confirm or extend the candidate paths for the public-cite project layout.
+The xcconfig lookup is in `scripts/fixers/{script_phase,build_setting}.py::_*xcconfig*` and extends to other layouts by adding candidate paths. v1.0.0 supports the conventional `Configurations/Project/Local/local-debug.xcconfig` layout; NetNewsWire's `xcconfig/common/` layout and Wikipedia-iOS's `Configurations/OpenSourceDebug.xcconfig` inform v1.x candidate-discovery work.
 
 ## References
 

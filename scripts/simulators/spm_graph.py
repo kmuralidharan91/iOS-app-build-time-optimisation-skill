@@ -19,8 +19,9 @@ from . import (
 
 # Heuristic per-file emit cost (defaults.md): aggregate SwiftEmitModule
 # across modules averages ~0.05-0.1s per file. Use the conservative end
-# so a 794-file module is predicted ~40s clean impact (matches the
-# private-corpus estimate of 39.7s).
+# so a hypothetical 794-file module is predicted ~40s clean impact;
+# v1.0.0 control: Wikipedia-iOS WMFComponents=213 files yields
+# ~10.65s clean impact prediction.
 _PER_FILE_EMIT_SECONDS_CLEAN = 0.05
 _PER_FILE_EMIT_SECONDS_INCREMENTAL = 0.04  # Per-file recompile when editing inside the module.
 
@@ -48,9 +49,9 @@ def predict_swift_syntax_not_prebuilt(
             "Xcode 26 release notes (line-level verified): prebuilt "
             "swift-syntax mechanism + opt-in setting documented. "
             "Predicted clean Δ heuristic 5-20s based on transitive root. "
-            "TODO(public-cite: Wikipedia-iOS, NetNewsWire) confirm the "
-            "project's Package.resolved pins swift-syntax (transitive via "
-            "Swift macros) and record the resolved version."
+            "v1.0.0 corpora (Wikipedia-iOS, NetNewsWire) do not pull "
+            "swift-syntax — magnitude calibration deferred to v1.1 "
+            "with a macro-using project."
         )
         clean_pred = Prediction(
             method=method,
@@ -68,12 +69,13 @@ def predict_swift_syntax_not_prebuilt(
         method = "literature"
         confidence = "low"
         tuning = (
-            "TODO(public-cite: Wikipedia-iOS, NetNewsWire) confirm the "
-            "project's Package.resolved pins swift-syntax (transitive via "
-            "Swift macros) and record the resolved version. Xcode 26 "
-            "prebuilt-swift-syntax claim UNVERIFIED at line level — see "
-            "references/sources.md. Predicted Δ surfaced as best-effort "
-            "heuristic; deferred verify must confirm before fix applies."
+            "v1.0.0 corpora (Wikipedia-iOS, NetNewsWire) Package.resolved "
+            "inspection: neither pulls swift-syntax. Magnitude calibration "
+            "deferred to v1.1 with a macro-using project. Xcode 26 "
+            "prebuilt-swift-syntax mechanism documented in release notes "
+            "(see references/build-optimization-sources.md). Predicted Δ "
+            "surfaced as best-effort heuristic; deferred verify must "
+            "confirm before fix applies."
         )
         clean_pred = Prediction(
             method=method,
@@ -154,23 +156,24 @@ def predict_oversized_module(
     clean_estimate = -total_clean
 
     tuning = (
-        "Private-corpus module file counts (defaults.md): a 794-file "
-        f"module and a 330-file module. Per-file emit ~0.05s clean. "
-        f"TODO(public-cite: Wikipedia-iOS, NetNewsWire) record per-module "
-        f".swift counts. Aggregated across {len(findings)} finding(s): "
+        "v1.0.0 evidence: Wikipedia-iOS@9200297c15 WMFComponents=213 "
+        "files (positive control; rule fires) vs WMFData=103 (does not). "
+        "NetNewsWire@build-comparison-base largest=Account 111 (negative "
+        f"control; none over threshold). Per-file emit ~0.05s clean. "
+        f"Aggregated across {len(findings)} finding(s): "
         f"{'; '.join(per_finding_breakdown) if per_finding_breakdown else '(no findings)'}."
     )
 
     clean_pred = Prediction(
-        method="measured-on-private-corpus",
+        method="measured-on-wikipedia-ios",
         estimate_seconds=clean_estimate,
         min_seconds=clean_estimate * 1.5,
         max_seconds=clean_estimate * 0.5,
         tuning_data_point=tuning,
         notes=(
             "Splitting the oversized module into smaller targets is the "
-            "real fix — per-file emit cost in a 794-file module exceeds "
-            "the parallel-emit budget on a typical macbook."
+            "real fix — per-file emit cost in a >200-file module starts "
+            "to dominate the parallel-emit budget on a typical macbook."
         ),
     )
 
@@ -181,13 +184,14 @@ def predict_oversized_module(
         min_seconds=-2.0 * len(findings),
         max_seconds=0.0,
         tuning_data_point=(
-            "Incremental impact is conditional on edit location: a one-line "
-            "change inside a 794-file module re-emits the entire module, "
-            "potentially adding 60-120s to incremental wall-clock vs a "
-            "~50s touched-AppDelegate baseline. TODO(public-cite: "
-            "Wikipedia-iOS, NetNewsWire) record incremental cost on a "
-            "comparable oversized module. Surfaced as 0s default with the "
-            "conditional captured in applies_when."
+            "Incremental impact is conditional on edit location: a "
+            "one-line change inside an oversized module re-emits the "
+            "entire module, potentially adding 60-120s to incremental "
+            "wall-clock vs Wikipedia's ~27.7s touched-AppDelegate "
+            "baseline (xcode-wikipedia-scheme-baseline/...json). "
+            "Per-module incremental-edit calibration deferred to v1.1 "
+            "with a benchmark inside an oversized module. Surfaced as "
+            "0s default with the conditional captured in applies_when."
         ),
         notes="0s default — actual cost surfaces only when edit is inside the module.",
     )

@@ -6,9 +6,13 @@ build's ranked task-class list with a total duration above the
 ``asset-catalog/incremental >= 3s`` threshold from
 ``references/defaults.md``, we emit a Finding.
 
-The threshold is sized against a private-corpus baseline measurement
-on incremental Debug builds. TODO(public-cite: NetNewsWire) confirm
-the threshold against a public iOS project.
+The threshold is sized against a development-time corpus baseline.
+v1.0.0 evidence: Wikipedia-iOS@9200297c15 clean budget includes
+53.86s CompileAssetCatalogVariant across 4 catalogs
+(docs/wikipedia-ios-analysis.md:40); NetNewsWire@build-comparison-base
+includes 15.35s across 3 catalogs (netnewswire-analysis.md:40). Both
+projects' incremental runs fall below the 3.0s threshold (negative
+controls — the rule does not fire on these clean codebases).
 
 Rule id: ``asset-catalog/incremental-recompile``.
 """
@@ -78,7 +82,7 @@ def run(context: DiagnosisContext) -> list[Finding]:
             ),
             impact_category="high" if duration_seconds >= 6.0 else "medium",
             wall_clock_predicted=WallClockPrediction(
-                method="measured-on-private-corpus",
+                method="measurement-derived",
                 estimate_seconds=duration_seconds,
                 min_seconds=max(duration_seconds - 2.0, 0.0),
                 max_seconds=duration_seconds,
@@ -87,9 +91,9 @@ def run(context: DiagnosisContext) -> list[Finding]:
                     "unchanged; non-zero incremental cost almost always "
                     "traces back to an upstream input invalidation, often "
                     "a script phase that mutates xcassets contents on "
-                    "every build. TODO(public-cite: NetNewsWire) confirm "
-                    "the equivalent root-cause script phase if the public "
-                    "project exhibits the same pattern."
+                    "every build. Estimate is the literal node duration "
+                    "from the supplied measurement.json — no calibration "
+                    "constant is involved on the incremental axis."
                 ),
             ),
             citation=Citation(

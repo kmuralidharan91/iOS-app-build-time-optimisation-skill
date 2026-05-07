@@ -66,7 +66,7 @@ Top-level fields:
 - **No silent fabrication when xcodebuild is unavailable.** When `xcodebuild -showBuildSettings -json` is missing / times out / returns non-JSON, the build-setting rules short-circuit and a top-level note records the limitation. F1, F2, F3, F5, F6, F7, F8 still run on pbxproj + SPM data alone.
 - **No build invocation.** This skill never runs `xcodebuild build`. Only `xcodebuild -showBuildSettings` (read-only) and stdlib filesystem reads.
 - **No platform fudge.** `--platform` other than `ios` raises `ValueError`; v2 work is additive, not retrofitted.
-- **No claims of measured impact for un-measured rules.** Each finding's `wall_clock_predicted_seconds.method` records whether the prediction is `measured-on-private-corpus` / `measured-on-wikipedia` / `heuristic` / `literature` so simulate and fix know which numbers are tunable.
+- **No claims of measured impact for un-measured rules.** Each finding's `wall_clock_predicted_seconds.method` records whether the prediction is `measured-on-wikipedia-ios` / `measured-on-netnewswire` / `measurement-derived` / `heuristic` / `literature` so simulate and fix know which numbers are tunable.
 
 ## References
 

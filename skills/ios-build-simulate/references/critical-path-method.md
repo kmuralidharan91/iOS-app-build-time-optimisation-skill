@@ -4,7 +4,7 @@
 
 The benchmark implementation parses the `Build Timing Summary` block emitted by `xcodebuild -showBuildTimingSummary` and reports task-class aggregates ranked by total wall-clock. Each "node" in the artifact's `critical_path.<build_type>.nodes` array is one xcodebuild task class (e.g. `SwiftCompile`, `Ld`, `CompileC`); `longest_chain_seconds` is the duration of the dominant class.
 
-**This is not a true critical-path DAG.** It does not walk per-target dependencies. On a private-corpus baseline, `SwiftCompile` totalled ~2336s as the dominant clean-build class — reflecting cumulative SwiftCompile work across all parallel-compiled targets, not a single longest dependency chain. Two targets that compile in parallel will both contribute to the SwiftCompile total even though only the slower one extends wall-clock. TODO(public-cite: NetNewsWire) record the equivalent dominant-class total on the public-cite project.
+**This is not a true critical-path DAG.** It does not walk per-target dependencies. On Wikipedia-iOS@`9200297c15` (Experimental scheme), `SwiftCompile` totalled **227.92 s clean across 102 parallel-compiled tasks** as the dominant clean-build class (`docs/wikipedia-ios-analysis.md:39`) — reflecting cumulative SwiftCompile work across all parallel-compiled targets, not a single longest dependency chain. NetNewsWire@`build-comparison-base` shows the same shape: **101.65 s clean across 143 SwiftCompile tasks** (`docs/netnewswire-analysis.md:39`). Two targets that compile in parallel will both contribute to the SwiftCompile total even though only the slower one extends wall-clock.
 
 When using this output, treat the `nodes` array as a **wall-clock budget by task class**: where the time is going, *not* what's blocking what.
 

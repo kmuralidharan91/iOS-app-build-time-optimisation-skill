@@ -58,7 +58,7 @@ def predict_incremental_recompile(
 
     if measured is not None:
         incremental_estimate = -measured
-        method = "measured-on-private-corpus"
+        method = "measurement-derived"
         confidence = "high"
         tuning = (
             "measurement.json incremental.critical_path.nodes "
@@ -66,7 +66,9 @@ def predict_incremental_recompile(
             "(touched-AppDelegate.swift incremental). Predicted Δ is the "
             "literal node duration — fixing the upstream input (e.g. a "
             "script phase that resets asset-catalog inputs every build) "
-            "recovers it. TODO(public-cite: NetNewsWire) confirm magnitude."
+            "recovers it. v1.0.0 controls: Wikipedia-iOS clean 53.86s "
+            "across 4 catalogs, NetNewsWire 15.35s across 3 catalogs; "
+            "neither incremental run exceeded the 3.0s threshold."
         )
         notes_text = (
             f"measurement.json supplied; node duration {measured:.3f}s used directly."
@@ -74,16 +76,17 @@ def predict_incremental_recompile(
     else:
         # Fall back to defaults.md reference baseline.
         incremental_estimate = -4.366
-        method = "measured-on-private-corpus"
+        method = "heuristic"
         confidence = "medium"
         tuning = (
-            "No measurement.json supplied; defaulting to private-corpus "
-            "incremental measurement 4.366s (defaults.md "
-            "asset-catalog/incremental-recompile). "
-            "TODO(public-cite: NetNewsWire) confirm magnitude."
+            "No measurement.json supplied; defaulting to development-time "
+            "reference 4.366s (defaults.md asset-catalog/incremental-"
+            "recompile). v1.0.0 corpora (Wikipedia-iOS, NetNewsWire) are "
+            "negative controls — neither incremental run exceeded the "
+            "3.0s threshold, so the rule does not fire on those baselines."
         )
         notes_text = (
-            "Fallback to private-corpus reference data — supply --measurement-artifact "
+            "Fallback to reference data — supply --measurement-artifact "
             "for project-specific prediction."
         )
 
@@ -97,7 +100,7 @@ def predict_incremental_recompile(
     )
 
     clean_pred = Prediction(
-        method="measured-on-private-corpus",
+        method="measurement-derived",
         estimate_seconds=0.0,
         min_seconds=0.0,
         max_seconds=0.0,
@@ -121,8 +124,8 @@ def predict_incremental_recompile(
         applies_when=(
             "An upstream input (likely a script phase that touches asset files) is "
             "modifying asset-catalog inputs on every build — locate and gate it",
-            "TODO(public-cite: NetNewsWire) document the equivalent root-cause "
-            "script phase if the public project exhibits the same pattern",
+            "v1.0.0 corpora do not exhibit this pattern (negative controls); "
+            "F5 backfill awaits a project that triggers the incremental finding",
         ),
         notes=(
             "F5 fix is about identifying the upstream invalidator, not making "

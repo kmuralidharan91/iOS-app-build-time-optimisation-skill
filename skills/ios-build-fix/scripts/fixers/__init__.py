@@ -53,9 +53,10 @@ class AppliedFix:
     ``files_modified`` is repository-relative (the parent worktree's
     repo, not the submodule's). ``submodule_changes`` is non-empty when
     the fix landed inside a submodule (e.g. F1's edit to a project
-    submodule's ``scripts/<step>/<crashlytics-runner>.sh``).
-    TODO(public-cite: NetNewsWire) cite the submodule path on the
-    public-cite project. The orchestrator uses these fields to write
+    submodule's ``scripts/<step>/<crashlytics-runner>.sh``). v1.0.0
+    corpora (Wikipedia-iOS, NetNewsWire) do not exhibit submodule-fix
+    cases; submodule path enumeration deferred to v1.1 against a
+    triggering project. The orchestrator uses these fields to write
     the ``applied_fix`` block in fix-result.json and to revert cleanly
     on error.
     """

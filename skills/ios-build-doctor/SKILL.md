@@ -77,7 +77,7 @@ Eight numbered questions; answers populate `DoctorContext`. Auto-detect first; a
 
 ## Top-N ranking
 
-The doctor's top-N table follows two rules: **auto-applicable rules first**, then **descending magnitude** by `max(|clean|, |incremental|)`. On a representative private-corpus checkout this places F4 (`build-setting/compilation-cache-disabled`, predicted ~-183.5s clean) at rank 1 reliably; F3 and F1 (or F9 with its designed null-delta) typically fill ranks 2–3. TODO(public-cite: NetNewsWire) confirm rankings against the public-cite project.
+The doctor's top-N table follows two rules: **auto-applicable rules first**, then **descending magnitude** by `max(|clean|, |incremental|)`. On Wikipedia-iOS@`9200297c15` this places F4 (`build-setting/compilation-cache-disabled`, predicted ~-40.9s clean against the 89.838s baseline) at rank 1; F3 (`script-phase/missing-output-declarations`) lands at rank 2 with -7s clean / -5.6s incremental; F9 (designed null-delta refusal-path) and F8 (~3s clean) fill ranks 3-4. NetNewsWire@`build-comparison-base` produces a similar ordering at smaller magnitudes (clean baseline 28.16s).
 
 Each row prints rule_id, predicted Δ on each axis, the auto-apply YES/NO badge (from the registry), confidence, and (when present) the diagnose finding's title. The user enters `1..N` or `s`.
 

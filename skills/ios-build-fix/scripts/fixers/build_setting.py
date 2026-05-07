@@ -20,20 +20,30 @@ from . import AppliedFix, ApplyError, FixContext, SubmoduleChange
 
 # F4 + F9 share the same Debug-xcconfig target; reuse the F3 helper.
 def _debug_xcconfig(project_root: pathlib.Path) -> pathlib.Path:
-    # TODO(public-cite: NetNewsWire) confirm the canonical xcconfig
-    # layout for the public-cite project and add additional candidates
-    # here. v1 supports a Configurations/Project/Local/local-debug.xcconfig
-    # layout; the fix refuses cleanly when no candidate matches.
+    # v1 supports a Configurations/Project/Local/local-debug.xcconfig
+    # layout. NetNewsWire uses xcconfig/common/NetNewsWire_codesigning_common.xcconfig
+    # + sibling-of-repo SharedXcodeSettings/DeveloperSettings.xcconfig
+    # (per docs/netnewswire-analysis.md:128); Wikipedia-iOS uses
+    # Configurations/OpenSourceDebug.xcconfig (per docs/conversation-journal.md
+    # bundle-id rewrite). Additional candidate layouts can be added here
+    # in v1.x; the fix refuses cleanly when no candidate matches.
     candidates = [
         project_root / "Configurations" / "Project" / "Local" / "local-debug.xcconfig",
     ]
+    # NetNewsWire-style: xcconfig/<Project>_project_debug.xcconfig
+    nnw_dir = project_root / "xcconfig"
+    if nnw_dir.is_dir():
+        candidates.extend(sorted(nnw_dir.glob("*_project_debug.xcconfig")))
+    # Wikipedia-iOS-style: Configurations/OpenSourceDebug.xcconfig
+    candidates.append(project_root / "Configurations" / "OpenSourceDebug.xcconfig")
     for candidate in candidates:
         if candidate.is_file():
             return candidate
     raise ApplyError(
-        "build-setting fixer: could not locate local-debug.xcconfig under "
-        "project root. v1 supports the Configurations/Project/Local "
-        "xcconfig layout only."
+        "build-setting fixer: could not locate a Debug xcconfig under "
+        "project root. v1 supports: Configurations/Project/Local/local-debug.xcconfig, "
+        "xcconfig/<Project>_project_debug.xcconfig (NetNewsWire-style), "
+        "Configurations/OpenSourceDebug.xcconfig (Wikipedia-iOS-style)."
     )
 
 
@@ -74,7 +84,7 @@ def preview_eager_linking_disabled(
     return (
         f"F9 eager-linking-disabled — set in {xcconfig.relative_to(ctx.project_root)}:\n"
         "  + EAGER_LINKING = YES\n"
-        "(Predicted Δ 0.0s on the private corpus; designed null-delta refusal-path test.)"
+        "(Predicted Δ 0.0s; designed null-delta refusal-path test — see build-benchmarks/netnewswire/fix-F9/.)"
     )
 
 

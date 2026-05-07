@@ -122,13 +122,13 @@ def preview_missing_output_declarations(
     ``ENABLE_USER_SCRIPT_SANDBOXING`` requires every existing script
     phase to declare its inputs/outputs and breaks the project's
     existing script-phase layout (resource-copy phases, codegen phases,
-    etc.) until those declarations land. Empirically validated against
-    a private iOS app during Phase A: enabling both together produces
-    ``** BUILD FAILED **`` with sandbox-denied PhaseScriptExecution.
-    TODO(public-cite: NetNewsWire) reproduce the failure mode on the
-    public-cite project. Predicted impact drops from -15.5s combined
-    (sandbox+fuse) to roughly the PR-#2 fuse-only band of -7s clean /
-    -5.6s incremental.
+    etc.) until those declarations land. Empirically validated during
+    development: enabling both together produces
+    ``** BUILD FAILED **`` with sandbox-denied PhaseScriptExecution
+    on projects with undeclared inputs (Wikipedia-iOS's 5 of 6
+    alwaysOutOfDate phases would trigger the same failure). Predicted
+    impact drops from -15.5s combined (sandbox+fuse) to roughly the
+    PR-#2 fuse-only band of -7s clean / -5.6s incremental.
     """
 
     xcconfig = _f3_xcconfig_target(ctx.project_root)
@@ -152,11 +152,10 @@ def apply_missing_output_declarations(
 
     v1 deliberately scopes the F3 fix to fuse-only. Sandbox + outputPaths
     is a v1.x enhancement (requires per-phase pbxproj edits). Empirically
-    validated against a private iOS app during Phase A: sandbox ON
-    without outputPaths breaks the project's resource-copy script phases
-    with sandbox-denied PhaseScriptExecution → ** BUILD FAILED **.
-    TODO(public-cite: NetNewsWire) reproduce the failure mode on the
-    public-cite project.
+    validated during development: sandbox ON without outputPaths breaks
+    resource-copy script phases with sandbox-denied PhaseScriptExecution
+    → ** BUILD FAILED **. Public-corpus measured Δ for the fuse-only
+    fix lands in build-benchmarks/netnewswire/fix-F3/.
     """
 
     xcconfig = _f3_xcconfig_target(ctx.project_root)
@@ -217,9 +216,10 @@ def preview_missing_debug_guard(
         "F2 script-phase/missing-debug-guard — informational in v1.\n"
         "Artifact-upload script phases (Crashlytics, dSYM, FullStory,\n"
         "Datadog, Sentry, Bugsnag) run on every build by default. Each\n"
-        "unguarded phase typically costs ~3s per Debug build  "
-        "[TODO(public-cite: NetNewsWire) confirm magnitude]; guarding\n"
-        "them recovers wall-clock for local dev iteration.\n"
+        "unguarded phase typically costs ~3s per Debug build (magnitude\n"
+        "calibration deferred to v1.1 — neither Wikipedia-iOS nor\n"
+        "NetNewsWire ships a triggering upload phase); guarding them\n"
+        "recovers wall-clock for local dev iteration.\n"
         "Recipe — add an early-exit guard at the top of each upload\n"
         "script:\n"
         "  if [ \"${CONFIGURATION}\" != \"Distribution\" ]; then\n"
@@ -255,9 +255,10 @@ def preview_swiftlint_on_build(
     return (
         "F8 script-phase/swiftlint-on-build — informational in v1.\n"
         "SwiftLint as a build phase blocks the compile pipeline for\n"
-        "~1-6s on every build [TODO(public-cite: NetNewsWire) confirm\n"
-        "magnitude]. Migrate to a pre-commit hook or CI step to recover\n"
-        "the time without losing enforcement.\n"
+        "~1-6s on every build (Wikipedia-iOS@9200297c15 measured 5.82s\n"
+        "incremental = 39% of 14.93s wall-clock; wikipedia-ios-analysis.md:55,76).\n"
+        "Migrate to a pre-commit hook or CI step to recover the time\n"
+        "without losing enforcement.\n"
         "Recipe:\n"
         "  1. Remove the SwiftLint PBXShellScriptBuildPhase from your\n"
         "     Xcode project (Build Phases tab; right-click → Delete).\n"
@@ -368,22 +369,30 @@ def _f3_xcconfig_target(project_root: pathlib.Path) -> pathlib.Path:
     ``baseConfigurationReference`` for the Debug configuration in the
     main pbxproj). This fixer assumes the conventional
     Configurations/Local layout for v1; future projects need a discovery
-    pass via ``xcodebuild -showBuildSettings``.
-    TODO(public-cite: NetNewsWire) extend the candidate list once
-    project shapes diverge from the convention.
+    pass via ``xcodebuild -showBuildSettings``. Public-corpus xcconfig
+    layouts (NetNewsWire's xcconfig/common/, Wikipedia-iOS's
+    Configurations/OpenSourceDebug.xcconfig) inform v1.x candidate
+    discovery.
     """
 
     candidates = [
         project_root / "Configurations" / "Project" / "Local" / "local-debug.xcconfig",
     ]
+    # NetNewsWire-style: xcconfig/<Project>_project_debug.xcconfig
+    nnw_dir = project_root / "xcconfig"
+    if nnw_dir.is_dir():
+        candidates.extend(sorted(nnw_dir.glob("*_project_debug.xcconfig")))
+    # Wikipedia-iOS-style: Configurations/OpenSourceDebug.xcconfig
+    candidates.append(project_root / "Configurations" / "OpenSourceDebug.xcconfig")
     for candidate in candidates:
         if candidate.is_file():
             return candidate
     raise ApplyError(
-        "F3: could not locate local-debug.xcconfig under project root. "
-        "v1 supports the conventional Configurations/Local layout; "
-        "TODO(public-cite: NetNewsWire) extend the candidate list once "
-        "project shapes diverge."
+        "F3: could not locate a Debug xcconfig under project root. "
+        "v1 supports: Configurations/Project/Local/local-debug.xcconfig "
+        "(conventional), xcconfig/<Project>_project_debug.xcconfig "
+        "(NetNewsWire-style), and Configurations/OpenSourceDebug.xcconfig "
+        "(Wikipedia-iOS-style). Add a candidate layout if your project differs."
     )
 
 

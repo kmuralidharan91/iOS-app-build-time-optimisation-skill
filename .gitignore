@@ -32,3 +32,5 @@ venv/
 # files extracted alongside each log are kept; the full logs are not.
 docs/smoke/**/runs-*/build-clean-*.log
 docs/smoke/**/runs-*/build-incremental-*.log
+build-benchmarks/**/runs-*/build-clean-*.log
+build-benchmarks/**/runs-*/build-incremental-*.log

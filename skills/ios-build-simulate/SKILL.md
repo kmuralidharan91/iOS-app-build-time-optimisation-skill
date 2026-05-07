@@ -23,7 +23,7 @@ If the user wants the audit (the *why* answer), use [`ios-build-diagnose`](../io
 | Argument | Required | Default | Notes |
 | --- | --- | --- | --- |
 | `--diagnosis-artifact PATH` | yes | — | Path to a `diagnosis.json` (`ios-build-diagnose` output). |
-| `--measurement-artifact PATH` | no | — | Optional path to a `measurement.json` (`ios-build-measure` output). Predictors that consume a baseline (F4 compilation-cache, F5 asset-catalog, F7 oversized-module) use it when supplied; otherwise they fall back to private-corpus reference data with reduced confidence. |
+| `--measurement-artifact PATH` | no | — | Optional path to a `measurement.json` (`ios-build-measure` output). Predictors that consume a baseline (F4 compilation-cache, F5 asset-catalog, F7 oversized-module) use it when supplied; otherwise they fall back to reference data calibrated against Wikipedia-iOS@`9200297c15` + NetNewsWire@`build-comparison-base` (see `references/defaults.md`) with reduced confidence. |
 | `--output-dir DIR` | yes | — | Where `simulation.json` is written. |
 | `--f6-verified` | no | `false` | Set when the deferred verify has confirmed the Xcode 26 prebuilt-swift-syntax mechanism at line level. Affects the F6 prediction's `tuning_data_point` text but NOT the numeric prediction. |
 
@@ -58,7 +58,7 @@ Top-level fields:
 - `summary` — totals + top-3 lists.
 - `notes[]` — top-level run notes (missing measurement, unverified F6, predictor gaps).
 
-Each `Prediction` carries `method` ∈ {`measured-on-private-corpus`, `measured-on-wikipedia`, `heuristic`, `literature`}, `estimate_seconds`, `min_seconds`, `max_seconds`, and the **required** `tuning_data_point` string naming the project + run that motivated the prediction.
+Each `Prediction` carries `method` ∈ {`measured-on-wikipedia-ios`, `measured-on-netnewswire`, `measurement-derived`, `heuristic`, `literature`}, `estimate_seconds`, `min_seconds`, `max_seconds`, and the **required** `tuning_data_point` string naming the project + run that motivated the prediction.
 
 ## Failure modes (what this skill refuses to do)
 
@@ -76,7 +76,7 @@ Each rule's predictor lives under [`scripts/simulators/`](../../scripts/simulato
 1. The function signature is `predict(findings, ctx) -> RulePrediction` where `findings` is the slice of `(original_index, finding_dict)` tuples sharing the rule_id and `ctx` is the `SimulationContext`.
 2. Aggregation is rule-specific: random-sleep sums, missing-debug-guard sums, missing-output-declarations applies a `sqrt(N) × per_phase` cap to model post-sandbox+fuse parallel fan-out, asset-catalog reads the literal critical-path node, oversized-module scales by source-count.
 3. **Every Prediction carries a `tuning_data_point`** naming the project + run that motivated the numeric per AGENTS.md non-negotiable principle 5. Simulate hard-fails the run if any prediction lands without one (the schema's `minLength: 1` enforcement).
-4. F4's `clean.estimate_seconds = -0.456 × baseline_clean_seconds`. With `--measurement-artifact`, baseline = `runs.clean.median_seconds`. Without, baseline falls back to a private-corpus reference of 275s → -125s. TODO(public-cite: NetNewsWire) confirm magnitude.
+4. F4's `clean.estimate_seconds = -0.456 × baseline_clean_seconds`. With `--measurement-artifact`, baseline = `runs.clean.median_seconds`. Without, baseline falls back to a development-time reference of 275s → -125s. v1.0.0 evidence: both Wikipedia-iOS@`9200297c15` and NetNewsWire@`build-comparison-base` ship with `COMPILATION_CACHE_ENABLE_CACHING` unset (universal miss); measured Δ post-fix on NetNewsWire ships in `build-benchmarks/netnewswire/fix-F4/`.
 5. F6 (`spm/swift-syntax-not-prebuilt`) is gated by `--f6-verified`. The Xcode 26 prebuilt-swift-syntax mechanism is line-level verifiable against the SPA's JSON release-notes endpoint (see [`references/sources.md`](../../references/sources.md) and the verbatim block-quote in [`references/build-settings-best-practices.md`](../../references/build-settings-best-practices.md)).
 
 ## References

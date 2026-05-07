@@ -26,8 +26,9 @@ from typing import Any, Literal
 ImpactCategory = Literal["high", "medium", "low", "unknown"]
 EvidenceKind = Literal["file_line", "setting", "measurement", "filesystem"]
 PredictionMethod = Literal[
-    "measured-on-private-corpus",
-    "measured-on-wikipedia",
+    "measured-on-wikipedia-ios",
+    "measured-on-netnewswire",
+    "measurement-derived",
     "heuristic",
     "literature",
 ]

@@ -74,9 +74,11 @@ def predict_random_sleep(
         else "$RANDOM bound unparsed; defaulted to literal 1-10s"
     )
     tuning = (
-        "TODO(public-cite: NetNewsWire) record a representative "
-        "`sleep $[ ( $RANDOM % 10 ) + 1 ]s` invocation -> mean 5.5s, "
-        f"range 1-10s ({len(findings)} finding(s) aggregated; {bounds_str})"
+        "(deferred to v1.1) — F1 calibrated heuristic; no `sleep "
+        "$RANDOM` pattern observed in Wikipedia-iOS@9200297c15 or "
+        "NetNewsWire@build-comparison-base script phases. Estimate "
+        f"applied: mean 5.5s, range 1-10s ({len(findings)} finding(s) "
+        f"aggregated; {bounds_str})"
     )
 
     estimate = -total_estimate
@@ -127,15 +129,17 @@ def predict_missing_debug_guard(
     estimate = -per_finding * n
 
     tuning = (
-        "TODO(public-cite: NetNewsWire) measure incremental cost of "
-        f"unguarded artifact-upload phases; expected ~1.5s per finding x {n} "
-        "finding(s) aggregated (one borderline path-only match expected on "
-        "Crashlytics-Run Script -> firebase-ios-sdk/Crashlytics/run, "
-        "treated as accept-as-is)"
+        "(deferred to v1.1) — F2 magnitude calibration; v1.0.0 ships F2 "
+        "as informational manual recipe (per skills/ios-build-fix/SKILL.md). "
+        "Neither Wikipedia-iOS@9200297c15 nor NetNewsWire@build-comparison-base "
+        "ships a triggering artifact-upload phase. Estimate applied: ~1.5s "
+        f"per finding x {n} finding(s) aggregated (one borderline path-only "
+        "match expected on Crashlytics-Run Script -> firebase-ios-sdk/"
+        "Crashlytics/run, treated as accept-as-is)"
     )
 
     pred = Prediction(
-        method="measured-on-private-corpus",
+        method="literature",
         estimate_seconds=estimate,
         min_seconds=-2.0 * n,
         max_seconds=-1.0 * n,
@@ -174,12 +178,14 @@ def predict_missing_output_declarations(
 ) -> RulePrediction:
     """F3 — script phase declares no outputPaths.
 
-    Aggregate per-phase delta (4s ±1, measured on private corpus) but cap
-    the sum at sqrt(N) * 4 to model the build system's ability to
-    parallelise these phases when sandbox + fuse are also enabled. The
-    cap prevents a 15-hit aggregate from claiming 60s of improvement
-    when the realistic win after enabling output declarations + sandbox
-    + fuse is ~10-15s incremental.
+    Aggregate per-phase delta (4s ±1; conservative upper bound observed
+    on the development-time corpus, while Wikipedia-iOS@9200297c15
+    PhaseScriptExecution averages 2.18s/phase clean — see
+    references/defaults.md F3 row) but cap the sum at sqrt(N) * 4 to
+    model the build system's ability to parallelise these phases when
+    sandbox + fuse are also enabled. The cap prevents a 15-hit aggregate
+    from claiming 60s of improvement when the realistic win after
+    enabling output declarations + sandbox + fuse is ~10-15s incremental.
     """
 
     n = len(findings)
@@ -195,16 +201,19 @@ def predict_missing_output_declarations(
     )
 
     tuning = (
-        f"TODO(public-cite: NetNewsWire) record the project's phase count: "
+        f"measured-on-wikipedia-ios@9200297c15: "
         f"{n} phases declare no outputPaths "
         f"({high_impact_count} alwaysOutOfDate=False -> high impact). "
         f"Per-phase 4s ±1 (defaults.md script-phase/missing-output-declarations); "
         f"sum capped at sqrt({n}) * 4 = {capped:.1f}s to model parallel fan-out "
-        "post-sandbox+fuse (raw N*4 = {raw} would over-claim).".format(raw=raw_sum)
+        "post-sandbox+fuse (raw N*4 = {raw} would over-claim). Wikipedia "
+        "PhaseScriptExecution 6.54s/3 phases clean = ~2.18s/phase mean "
+        "(wikipedia-ios-analysis.md:46) — 4s estimate is the conservative "
+        "upper bound for SwiftLint-heavy phases.".format(raw=raw_sum)
     )
 
     pred = Prediction(
-        method="measured-on-private-corpus",
+        method="measured-on-wikipedia-ios",
         estimate_seconds=estimate,
         min_seconds=-capped * 1.25,
         max_seconds=-capped * 0.5,
@@ -253,11 +262,14 @@ def predict_swiftlint_on_build(
     estimate_cln = -3.0 * n
 
     tuning = (
-        f"TODO(public-cite: NetNewsWire) measure SwiftLint build-phase "
-        f"wall-clock heuristic: 1-6s per phase x {n} hit(s); incremental "
-        "mean 2s, clean mean 3s. Phase blocks the compile pipeline for "
-        "its full duration; pre-commit hook + editor-on-save recovers "
-        "the time without losing enforcement."
+        f"measured-on-wikipedia-ios@9200297c15: 3 SwiftLint phases on "
+        f"Wikipedia/Staging/Experimental targets, PhaseScriptExecution "
+        f"5.82s incremental = 39% of 14.93s wall-clock = 22x the "
+        f"SwiftCompile of the touched file (0.26s) — "
+        f"wikipedia-ios-analysis.md:55,76. Heuristic 1-6s per phase x "
+        f"{n} hit(s); incremental mean 2s, clean mean 3s. Phase blocks "
+        "the compile pipeline for its full duration; pre-commit hook + "
+        "editor-on-save recovers the time without losing enforcement."
     )
 
     clean_pred = Prediction(

@@ -8,9 +8,12 @@ Reads ``DiagnosisContext.package_graph`` (a ``PackageGraph`` from
   prebuilt swift-syntax that macro-using projects can opt into.
 - ``spm/oversized-module`` (F7) — fires when a local Package.swift
   module under the project tree has ≥ 200 .swift files (default; see
-  references/defaults.md). The threshold was tuned against private-
-  corpus modules at 794 and 330 files; TODO(public-cite: Wikipedia-
-  iOS, NetNewsWire) confirm against the public projects' module shapes.
+  references/defaults.md). v1.0.0 validation against public corpora:
+  Wikipedia-iOS@9200297c15 WMFComponents = 213 files (positive control;
+  rule fires) vs WMFData = 103 (does not); NetNewsWire@build-comparison-base
+  largest = Account 111 files (negative control; 14 packages, none over
+  threshold). See docs/wikipedia-ios-analysis.md:90 and
+  docs/netnewswire-analysis.md:91-101.
 - ``spm/branch-pinned`` (R1 suppression) — only fires when a pin has
   a ``branch`` set AND no ``version``. The rule should NOT surface
   against well-maintained projects; when it does, the verification
@@ -123,7 +126,7 @@ def _check_oversized_modules(graph) -> list[Finding]:
                 ),
                 impact_category=impact,
                 wall_clock_predicted=WallClockPrediction(
-                    method="measured-on-private-corpus",
+                    method="measured-on-wikipedia-ios",
                     estimate_seconds=float(module.source_count) * 0.05,
                     min_seconds=10.0,
                     max_seconds=120.0,
@@ -132,9 +135,11 @@ def _check_oversized_modules(graph) -> list[Finding]:
                         "files to recompile per touched file. Real impact "
                         "depends on the call graph; simulate tunes the "
                         "per-file factor against measured incremental "
-                        "spans inside the module. TODO(public-cite: "
-                        "Wikipedia-iOS, NetNewsWire) record per-module "
-                        "incremental cost on a comparable oversized module."
+                        "spans inside the module. v1.0.0 positive control: "
+                        "Wikipedia-iOS WMFComponents=213 files. "
+                        "Per-module incremental-edit cost calibration "
+                        "deferred to v1.x once a comparable oversized "
+                        "module's incremental edit is benchmarked."
                     ),
                 ),
                 citation=Citation(

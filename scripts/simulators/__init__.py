@@ -27,8 +27,9 @@ from typing import Any, Literal
 
 
 PredictionMethod = Literal[
-    "measured-on-private-corpus",
-    "measured-on-wikipedia",
+    "measured-on-wikipedia-ios",
+    "measured-on-netnewswire",
+    "measurement-derived",
     "heuristic",
     "literature",
 ]

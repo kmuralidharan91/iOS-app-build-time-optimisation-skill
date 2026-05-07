@@ -289,15 +289,17 @@ def _check_missing_debug_guard(
         ),
         impact_category="medium",
         wall_clock_predicted=WallClockPrediction(
-            method="measured-on-private-corpus",
+            method="literature",
             estimate_seconds=3.0,
             min_seconds=2.0,
             max_seconds=4.0,
             notes=(
-                "TODO(public-cite: NetNewsWire) confirm: Crashlytics and "
-                "dSYM-upload phases run on every Debug build on the "
-                "private corpus; gating them with $CONFIGURATION="
-                "\"Debug\" early-exit recovers the run time."
+                "Crashlytics and dSYM-upload phases run on every Debug "
+                "build when unguarded; gating them with $CONFIGURATION="
+                "\"Debug\" early-exit recovers the run time. Magnitude "
+                "calibration deferred to v1.1 — neither Wikipedia-iOS "
+                "nor NetNewsWire ships a triggering artifact-upload "
+                "phase (see references/defaults.md F2 row)."
             ),
         ),
         citation=Citation(
@@ -338,15 +340,17 @@ def _check_missing_output_declarations(phase) -> Iterable[Finding]:
         ),
         impact_category=impact,
         wall_clock_predicted=WallClockPrediction(
-            method="measured-on-private-corpus",
+            method="measured-on-wikipedia-ios",
             estimate_seconds=4.0,
             min_seconds=3.0,
             max_seconds=5.0,
             notes=(
-                "TODO(public-cite: NetNewsWire) confirm magnitude: phases "
-                "without output declarations defeat Xcode's 'run only "
-                "when inputs change' optimisation; estimate is per-build "
-                "incremental cost."
+                "Wikipedia-iOS@9200297c15 confirms: 5 of 6 PhaseScript "
+                "phases run alwaysOutOfDate=1, contributing 5.82s = 39% "
+                "of incremental wall-clock (docs/wikipedia-ios-analysis.md:"
+                "74-78). Per-phase 4s estimate is conservative upper bound; "
+                "phases without output declarations defeat Xcode's 'run only "
+                "when inputs change' optimisation."
             ),
         ),
         citation=Citation(

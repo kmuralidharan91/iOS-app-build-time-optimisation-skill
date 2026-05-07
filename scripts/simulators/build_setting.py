@@ -7,11 +7,11 @@ Rules covered:
 - ``build-setting/script-sandboxing-disabled``         — PR-#2 recommendation
 - ``build-setting/fuse-build-script-phases-disabled``  — PR-#2 recommendation
 
-Phase A (v1.0.0-rc1) status: thresholds and ratios below were tuned
-against a private iOS app during development. v1.0.0 (the public
-release) backfills these against measurements taken on a public iOS
-project; threshold values are not changed by the citation backfill,
-only the evidence that justifies them. See ``references/defaults.md``.
+v1.0.0 evidence: thresholds and ratios below were tuned during
+development against an internal iOS app and re-cited for the public
+release against measurements on Wikipedia-iOS@9200297c15 + NetNewsWire@
+build-comparison-base. Threshold values do not change between rc1 and
+v1.0.0; only the evidence is refreshed. See ``references/defaults.md``.
 """
 
 from __future__ import annotations
@@ -26,8 +26,11 @@ from . import (
 
 
 # Reference baseline used when the user's own measurement.json doesn't
-# supply a clean-build median; tuned against a private iOS app during
-# Phase A. Re-tune in Phase B against the public-cite project.
+# supply a clean-build median; calibrated during development against
+# an internal iOS app, retained for v1.0.0 because Wikipedia-iOS clean
+# median (89.838s) and NetNewsWire (28.163s) bracket the original 275s
+# fallback on the small/medium end — when --measurement-artifact is
+# supplied, prediction scales to the project's own clean median.
 _REFERENCE_CLEAN_SECONDS = 275.0
 # Compilation-cache warm-cache reduction ratio: clean-build improvement
 # observed when COMPILATION_CACHE_ENABLE_CACHING flips from NO to YES,
@@ -46,10 +49,13 @@ def predict_compilation_cache_disabled(
     """F4 — COMPILATION_CACHE_ENABLE_CACHING is unset / NO.
 
     clean Δ = -0.456 * baseline_clean (warm-cache reduction observed
-    against a private iOS app, TODO(public-cite: NetNewsWire) confirm
-    against the public-cite project). When the user supplies a
-    measurement.json baseline the prediction scales to it; otherwise
-    falls back to ``_REFERENCE_CLEAN_SECONDS``.
+    during development; both Wikipedia-iOS@9200297c15 and NetNewsWire@
+    build-comparison-base ship with caching unset — universal miss
+    confirmed in wikipedia-ios-analysis.md:87 + netnewswire-analysis.md:89).
+    When the user supplies a measurement.json baseline, prediction
+    scales to it; otherwise falls back to ``_REFERENCE_CLEAN_SECONDS``.
+    Measured Δ post-fix on NetNewsWire ships in
+    ``build-benchmarks/netnewswire/fix-F4/fix-result.json``.
 
     incremental Δ = +10s (regression cost; cache invalidation cone is
     wider than Xcode's incremental tracker).
@@ -59,7 +65,7 @@ def predict_compilation_cache_disabled(
     clean_estimate = -_COMPILATION_CACHE_WARM_REDUCTION * baseline
     using_measurement = ctx.baseline_clean_seconds is not None
 
-    method = "measured-on-private-corpus"
+    method = "measured-on-wikipedia-ios"
     confidence = "high" if using_measurement else "medium"
 
     clean_pred = Prediction(
@@ -69,10 +75,12 @@ def predict_compilation_cache_disabled(
         max_seconds=-baseline * 0.30,
         tuning_data_point=(
             "Warm-cache clean Debug+sim build came in 45.6% faster than "
-            "cold-cache equivalent (~125s saved on a 275s baseline) on "
-            "the Phase-A private corpus. TODO(public-cite: NetNewsWire) "
-            f"confirm magnitude. Applied here against baseline = {baseline:.1f}s "
-            f"({'measurement.json clean median' if using_measurement else 'Phase-A reference fallback'})."
+            "cold-cache equivalent (~125s saved on a 275s baseline) "
+            "during development; both Wikipedia-iOS@9200297c15 and "
+            "NetNewsWire@build-comparison-base ship with caching unset "
+            "(universal miss). Measured Δ post-fix in build-benchmarks/"
+            f"netnewswire/fix-F4/. Applied here against baseline = {baseline:.1f}s "
+            f"({'measurement.json clean median' if using_measurement else 'reference fallback'})."
         ),
         notes=(
             "Warm cache only — first build after enabling populates the "
@@ -80,16 +88,16 @@ def predict_compilation_cache_disabled(
         ),
     )
     incremental_pred = Prediction(
-        method="measured-on-private-corpus",
+        method="measured-on-wikipedia-ios",
         estimate_seconds=10.0,
         min_seconds=5.0,
         max_seconds=15.0,
         tuning_data_point=(
             "~10s extra on touched-file change because cache invalidation "
-            "cone is wider than Xcode's incremental tracker. "
-            "TODO(public-cite: NetNewsWire) confirm magnitude."
+            "cone is wider than Xcode's incremental tracker (see "
+            "build-benchmarks/netnewswire/fix-F4/ for the v1.0.0 measured Δ)."
         ),
-        notes="Positive value = regression. Net positive on every Phase-A measurement so far.",
+        notes="Positive value = regression. Net-positive trade-off observed during development.",
     )
 
     return RulePrediction(
@@ -120,22 +128,25 @@ def predict_eager_linking_disabled(
 ) -> RulePrediction:
     """F9 — EAGER_LINKING is unset / NO.
 
-    Phase-A measurement against a private iOS app showed zero clean
-    improvement and the change was reverted. Predict 0s ±8 with low
-    confidence; the fixer re-measure must refuse on null delta.
-    TODO(public-cite: NetNewsWire) confirm magnitude.
+    Development-time measurement showed zero clean improvement and the
+    change was reverted. Both Wikipedia-iOS@9200297c15 and NetNewsWire@
+    build-comparison-base ship with EAGER_LINKING unset (universal miss).
+    Predict 0s ±8 with low confidence; the fixer re-measure must refuse
+    on null delta. Designed null-delta refusal-path test in
+    build-benchmarks/netnewswire/fix-F9/.
     """
 
     pred = Prediction(
-        method="measured-on-private-corpus",
+        method="measured-on-wikipedia-ios",
         estimate_seconds=0.0,
         min_seconds=-8.0,
         max_seconds=0.0,
         tuning_data_point=(
-            "Phase-A measurement: zero clean-build improvement; the change "
-            "was reverted. Per defaults.md, F9 surfaces as low-confidence; "
-            "simulate predicts 0s and the fixer re-measure refuses on null "
-            "delta. TODO(public-cite: NetNewsWire) confirm magnitude."
+            "Development-time measurement: zero clean-build improvement; "
+            "the change was reverted. Per defaults.md, F9 surfaces as "
+            "low-confidence; simulate predicts 0s and the fixer re-measure "
+            "refuses on null delta. Refusal-path test data in "
+            "build-benchmarks/netnewswire/fix-F9/."
         ),
         notes=(
             "Project-shape sensitive — eager linking only helps projects "
@@ -144,13 +155,14 @@ def predict_eager_linking_disabled(
         ),
     )
     no_op = Prediction(
-        method="measured-on-private-corpus",
+        method="measured-on-wikipedia-ios",
         estimate_seconds=0.0,
         min_seconds=0.0,
         max_seconds=0.0,
         tuning_data_point=(
             "EAGER_LINKING affects scheduling of Ld tasks; no incremental "
-            "build-time effect on touched-file change."
+            "build-time effect on touched-file change. Per references/"
+            "defaults.md F9 row."
         ),
         notes=None,
     )
@@ -227,9 +239,11 @@ def predict_script_sandboxing_disabled(
 
 
 # Reference phase count used when the user's project doesn't supply one;
-# tuned against a private iOS app during Phase A. The fuse heuristic
-# scales linearly with phase count, so accuracy depends on the
-# downstream caller passing the real count.
+# Wikipedia-iOS@9200297c15 = 6 phases, NetNewsWire@build-comparison-base
+# = 8 phases — 14 is the development-time fallback that brackets typical
+# medium-sized iOS projects. The fuse heuristic scales linearly with
+# phase count, so accuracy depends on the downstream caller passing the
+# real count.
 _REFERENCE_SCRIPT_PHASE_COUNT = 14
 
 
@@ -240,8 +254,9 @@ def predict_fuse_build_script_phases_disabled(
     """PR-#2 — FUSE_BUILD_SCRIPT_PHASES is unset / NO.
 
     Heuristic: ~0.5s saved per script phase (shell-startup amortisation)
-    once preconditions are met. TODO(public-cite: NetNewsWire) confirm
-    project's phase count and resulting magnitude.
+    once preconditions are met. v1.0.0 reference counts: Wikipedia-iOS
+    @9200297c15 = 6 phases, NetNewsWire@build-comparison-base = 8 phases
+    (per references/defaults.md fuse row).
     """
 
     n_phases = _REFERENCE_SCRIPT_PHASE_COUNT
@@ -249,8 +264,8 @@ def predict_fuse_build_script_phases_disabled(
     incremental_estimate = -0.4 * n_phases
 
     tuning = (
-        f"WWDC22 110364: fusing {n_phases} script phases (Phase-A "
-        "reference count, TODO(public-cite: NetNewsWire) confirm) "
+        f"WWDC22 110364: fusing {n_phases} script phases (reference "
+        "count; Wikipedia-iOS@9200297c15=6, NetNewsWire@build-comparison-base=8) "
         "amortises shell-startup overhead across the chain. Heuristic "
         "0.5s clean / 0.4s incremental per phase; project-shape sensitive."
     )

@@ -100,18 +100,23 @@ def _check_compilation_cache(
             ),
             impact_category="high",
             wall_clock_predicted=WallClockPrediction(
-                method="measured-on-private-corpus",
+                method="measured-on-wikipedia-ios",
                 estimate_seconds=125.0,
                 min_seconds=60.0,
                 max_seconds=180.0,
                 notes=(
-                    "Private-corpus measurement: enabling this setting cut "
-                    "warm-cache clean-build wall-clock by ~45.6%; the "
-                    "estimate is the absolute seconds saved on a 275s "
-                    "clean baseline. TODO(public-cite: NetNewsWire) "
-                    "confirm magnitude. Trade-off: ~10s incremental cost "
-                    "on touched-file change because the cache invalidates "
-                    "more files than Xcode's incremental tracker."
+                    "Development-time corpus measurement: enabling this "
+                    "setting cut warm-cache clean-build wall-clock by "
+                    "~45.6%; estimate is absolute seconds saved on a "
+                    "275s clean baseline. Both Wikipedia-iOS@9200297c15 "
+                    "and NetNewsWire@build-comparison-base ship with "
+                    "COMPILATION_CACHE_ENABLE_CACHING unset (universal "
+                    "miss; wikipedia-ios-analysis.md:87, "
+                    "netnewswire-analysis.md:89). Measured Δ post-fix "
+                    "ships in build-benchmarks/netnewswire/fix-F4/. "
+                    "Trade-off: ~10s incremental regression because the "
+                    "cache invalidates more files than Xcode's "
+                    "incremental tracker."
                 ),
             ),
             citation=Citation(
@@ -145,18 +150,22 @@ def _check_eager_linking(
             ),
             impact_category="low",
             wall_clock_predicted=WallClockPrediction(
-                method="measured-on-private-corpus",
+                method="measured-on-wikipedia-ios",
                 estimate_seconds=0.0,
                 min_seconds=0.0,
                 max_seconds=8.0,
                 notes=(
-                    "Predicted improvement is project-shaped; the "
-                    "private-corpus measurement showed zero improvement "
-                    "and the change was reverted. TODO(public-cite: "
-                    "NetNewsWire) confirm magnitude. Surface as "
-                    "low-confidence; rely on simulate -> fix -> "
-                    "re-measure to refuse claims of improvement when the "
-                    "actual delta is null."
+                    "Predicted improvement is project-shaped. Both "
+                    "Wikipedia-iOS@9200297c15 (wikipedia-ios-analysis.md:86) "
+                    "and NetNewsWire@build-comparison-base "
+                    "(netnewswire-analysis.md:88) ship with EAGER_LINKING "
+                    "unset (universal miss). Development-time corpus "
+                    "measurement showed zero clean-build improvement; the "
+                    "designed null-delta refusal-path test on NetNewsWire "
+                    "ships in build-benchmarks/netnewswire/fix-F9/. "
+                    "Surface as low-confidence; rely on simulate -> fix "
+                    "-> re-measure to refuse claims of improvement when "
+                    "the actual delta is null."
                 ),
             ),
             citation=Citation(
@@ -248,9 +257,9 @@ def _check_fuse_build_script_phases(
                 max_seconds=None,
                 notes=(
                     "Wall-clock impact scales with phase count and "
-                    "spawn overhead per phase. TODO(public-cite: "
-                    "NetNewsWire) record the project's "
-                    "PBXShellScriptBuildPhase count; fusing them "
+                    "spawn overhead per phase. v1.0.0 reference counts: "
+                    "Wikipedia-iOS@9200297c15 = 6 phases, NetNewsWire@"
+                    "build-comparison-base = 8 phases. Fusing them "
                     "amortises shell startup across the chain."
                 ),
             ),

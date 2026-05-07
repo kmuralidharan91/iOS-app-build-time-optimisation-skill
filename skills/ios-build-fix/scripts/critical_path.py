@@ -9,12 +9,13 @@ artifact. Each task class is reported as one node ranked by duration;
 
 Per-target attribution and a true dependency-DAG walk would need to
 parse the 14000+ ActivityLogCommandInvocationSection entries inside
-the ``.xcresult`` bundle (verified against a Phase-A baseline:
-xcresulttool 24757, schema 0.1.0, ~14865 top-level command
-invocations on a single Build action — not grouped by target).
-TODO(public-cite: NetNewsWire) reproduce the count on the public-cite
-project. That work is deferred alongside the diagnose pass, which
-already needs to walk per-target build settings and script phases.
+the ``.xcresult`` bundle (verified against a development-time baseline:
+xcresulttool 24757, schema 0.1.0, ~14865 top-level command invocations
+on a single Build action — not grouped by target). Equivalent
+top-level command counts on the v1.0.0 corpora ship in
+``build-benchmarks/{wikipedia-ios,netnewswire}/`` xcresult bundles.
+That work is deferred alongside the diagnose pass, which already
+needs to walk per-target build settings and script phases.
 
 Two parsing inputs are accepted, in order of preference:
 

@@ -212,7 +212,7 @@ def simulate(
         notes.append(
             "No --measurement-artifact supplied; predictors that consume "
             "it (compilation-cache, asset-catalog, oversized-module) fall "
-            "back to private-corpus reference data with reduced confidence."
+            "back to reference data with reduced confidence."
         )
     if not f6_verified:
         notes.append(

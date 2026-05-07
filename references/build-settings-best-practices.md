@@ -21,18 +21,24 @@ configuration). Leave Release / Distribution decisions to the team
 that ships builds — release pipelines often want `clean` semantics
 to avoid masking determinism bugs.
 
-**Measurement.** On a private-corpus baseline a warm-cache clean
-Debug+sim build came in **~45.6% faster** than the cold-cache
-equivalent (≈125s saved on a 275s baseline). Numbers will vary with
-project shape. TODO(public-cite: NetNewsWire) record the per-project
-tuning data point.
+**Measurement.** On the development-time internal corpus a warm-cache
+clean Debug+sim build came in **~45.6% faster** than the cold-cache
+equivalent (≈125 s saved on a 275 s baseline). Numbers vary with
+project shape. v1.0.0 evidence: both Wikipedia-iOS@`9200297c15`
+(`docs/wikipedia-ios-analysis.md:87`) and NetNewsWire@`build-comparison-base`
+(`docs/netnewswire-analysis.md:89`) ship with
+`COMPILATION_CACHE_ENABLE_CACHING` **unset** (universal miss confirms
+the rule fires). Measured warm-cache Δ on NetNewsWire ships in
+`build-benchmarks/netnewswire/fix-F4/fix-result.json` (Phase B step 14).
 
 **Risk.** Incremental builds can pay a small cache-invalidation cost
-(~10s extra on touched-file change observed against the private
-corpus) because the cache sees a wider invalidation cone than Xcode's
-per-target incremental tracker. Net positive on every private-corpus
-measurement so far, but track the per-project trade-off rather than
-enabling blindly. TODO(public-cite: NetNewsWire) confirm.
+(~10 s extra on touched-file change observed during development)
+because the cache sees a wider invalidation cone than Xcode's
+per-target incremental tracker. Track the per-project trade-off rather
+than enabling blindly; the fixer's re-measure step refuses to claim
+success when net Δ is null/regressive (see
+`build-benchmarks/netnewswire/fix-F4/fix-result.json` for the v1.0.0
+data point).
 
 ## `EAGER_LINKING`
 
@@ -49,11 +55,15 @@ fit the eager-link shape (pure-Swift dynamic frameworks linked by
 their dependents). Diagnose flags `unset` / `NO` and lets simulate +
 fix decide whether the project's actual graph benefits.
 
-**Measurement.** On a private-corpus baseline, enabling `EAGER_LINKING`
-measured **zero clean-build improvement** and the change was
-reverted. F9's `impact_category=low` reflects that.
-TODO(public-cite: NetNewsWire, Wikipedia-iOS) tune this against the
-public projects.
+**Measurement.** On the development-time internal corpus, enabling
+`EAGER_LINKING` measured **zero clean-build improvement** and the change
+was reverted. F9's `impact_category=low` reflects that. v1.0.0 evidence:
+both Wikipedia-iOS@`9200297c15` (`docs/wikipedia-ios-analysis.md:86`)
+and NetNewsWire@`build-comparison-base`
+(`docs/netnewswire-analysis.md:88`) ship with `EAGER_LINKING` unset
+(universal miss). The designed null-delta refusal-path test on
+NetNewsWire ships in `build-benchmarks/netnewswire/fix-F9/fix-result.json`
+(expected `outcome=refused-null`; Phase B step 14).
 
 **Risk.** Almost none — the optimisation only changes scheduling.
 The mitigation when impact is null is to revert; the
@@ -104,10 +114,11 @@ of that prerequisite ordering.
 **Measurement.** Wall-clock win scales with phase count and the
 spawn / setup overhead per phase. The fuse win amortises
 shell-startup time across the phase chain. Project-shape sensitive.
-TODO(public-cite: NetNewsWire) record the project's
-`PBXShellScriptBuildPhase` count and resulting magnitude once the
-prerequisite (correct input/output declarations on every phase, F3
-finding family) is applied.
+v1.0.0 reference counts: Wikipedia-iOS@`9200297c15` = 6 phases,
+NetNewsWire@`build-comparison-base` = 8 phases. Per-phase magnitude
+once the F3 prerequisite (correct input/output declarations) is applied
+ships in `build-benchmarks/netnewswire/fix-F3/fix-result.json` (Phase B
+step 14).
 
 **Risk.** WWDC22 110364, verbatim:
 
@@ -127,7 +138,14 @@ Rule id: `spm/swift-syntax-not-prebuilt` (F6 ground truth).
 
 **Recommended.** Use Xcode 26 (or later); leave `IDEPackageEnablePrebuilts` at its automatic-on default. There is **no project-side build setting** to flip — the mechanism is opt-in by virtue of Xcode version, not by xcconfig.
 
-**Measurement.** Estimated 5–20s clean-build savings depending on how many macro-using packages reach `swift-syntax` transitively. TODO(public-cite: Wikipedia-iOS, NetNewsWire) confirm the project's `Package.resolved` pins swift-syntax (transitive via Swift macros) and record the resolved version. Simulate predicts -12s ±7s for F6 with `confidence=low` (heuristic; project-shape sensitive).
+**Measurement.** Estimated 5–20 s clean-build savings depending on how
+many macro-using packages reach `swift-syntax` transitively. Neither
+v1.0.0 corpus (Wikipedia-iOS, NetNewsWire) pulls swift-syntax — see
+`references/defaults.md` "spm/swift-syntax-not-prebuilt" section for
+the Package.resolved evidence. Magnitude calibration is **deferred to
+v1.1** against a project that actually pulls swift-syntax (e.g. a
+SwiftFormat-using app). Simulate predicts -12 s ±7 s for F6 with
+`confidence=low` (heuristic; project-shape sensitive).
 
 **Risk.** Apple's Xcode 26 release notes list two known build-failure modes for macro-dependent projects + one Legacy Preview Execution issue, all worked around by disabling the feature via `defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts NO`. Apply that workaround only when build failures around `_SwiftSyntaxCShims` appear; it disables the speedup repo-wide for that user.
 
