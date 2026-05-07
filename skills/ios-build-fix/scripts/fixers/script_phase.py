@@ -21,6 +21,7 @@ import subprocess
 from typing import Any
 
 from . import AppliedFix, ApplyError, FixContext, SubmoduleChange
+from .spm_graph import _no_op
 
 
 _RANDOM_SLEEP_PATTERN = re.compile(
@@ -195,6 +196,91 @@ def apply_missing_output_declarations(
         git_sha_after=sha_after,
         submodule_changes=tuple(submodule_changes),
         notes=f"Added FUSE_BUILD_SCRIPT_PHASES=YES to {rel}.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# F2 / F8 — informational stubs (v1.0.1: registered as manual recipes)
+# ---------------------------------------------------------------------------
+
+
+def preview_missing_debug_guard(
+    findings: list[tuple[int, dict[str, Any]]],
+    ctx: FixContext,
+) -> str:
+    return (
+        "F2 script-phase/missing-debug-guard — informational in v1.\n"
+        "Artifact-upload script phases (Crashlytics, dSYM, FullStory,\n"
+        "Datadog, Sentry, Bugsnag) run on every build by default. Each\n"
+        "unguarded phase typically costs ~3s per Debug build  "
+        "[TODO(public-cite: NetNewsWire) confirm magnitude]; guarding\n"
+        "them recovers wall-clock for local dev iteration.\n"
+        "Recipe — add an early-exit guard at the top of each upload\n"
+        "script:\n"
+        "  if [ \"${CONFIGURATION}\" != \"Distribution\" ]; then\n"
+        "      echo \"Skipping <upload-task> on ${CONFIGURATION} build.\"\n"
+        "      exit 0\n"
+        "  fi\n"
+        "(Replace 'Distribution' with your release configuration name;\n"
+        "some teams use 'Release' or a custom name.)\n"
+        "Auto-application is deferred to v1.x because the heuristic for\n"
+        "detecting which phases are upload-vs-required is per-project — a\n"
+        "fixer can't safely tell whether a script that mentions 'firebase'\n"
+        "is an artifact upload or a runtime initialisation step.\n"
+        "Cited: WWDC22 110364 — Demystify parallelization in Xcode builds."
+    )
+
+
+def apply_missing_debug_guard(
+    findings: list[tuple[int, dict[str, Any]]],
+    ctx: FixContext,
+) -> AppliedFix:
+    return _no_op(
+        ctx,
+        "F2 fixer is informational in v1; adding a Debug early-exit guard "
+        "requires reading each upload script's body and can't be safely "
+        "auto-applied without per-project review.",
+    )
+
+
+def preview_swiftlint_on_build(
+    findings: list[tuple[int, dict[str, Any]]],
+    ctx: FixContext,
+) -> str:
+    return (
+        "F8 script-phase/swiftlint-on-build — informational in v1.\n"
+        "SwiftLint as a build phase blocks the compile pipeline for\n"
+        "~1-6s on every build [TODO(public-cite: NetNewsWire) confirm\n"
+        "magnitude]. Migrate to a pre-commit hook or CI step to recover\n"
+        "the time without losing enforcement.\n"
+        "Recipe:\n"
+        "  1. Remove the SwiftLint PBXShellScriptBuildPhase from your\n"
+        "     Xcode project (Build Phases tab; right-click → Delete).\n"
+        "  2. Add SwiftLint as a pre-commit hook. Example\n"
+        "     .pre-commit-config.yaml:\n"
+        "       repos:\n"
+        "         - repo: https://github.com/realm/SwiftLint\n"
+        "           rev: 0.55.0\n"
+        "           hooks:\n"
+        "             - id: swiftlint\n"
+        "               entry: swiftlint --strict\n"
+        "  3. Or wire SwiftLint into your CI (GitHub Actions /\n"
+        "     GitLab CI):\n"
+        "       - run: swiftlint --strict\n"
+        "  4. Document the change so contributors install pre-commit on\n"
+        "     fresh clones (`pre-commit install`).\n"
+        "Cited: WWDC22 110364 — Demystify parallelization in Xcode builds."
+    )
+
+
+def apply_swiftlint_on_build(
+    findings: list[tuple[int, dict[str, Any]]],
+    ctx: FixContext,
+) -> AppliedFix:
+    return _no_op(
+        ctx,
+        "F8 fixer is informational in v1; SwiftLint migration to "
+        "pre-commit/CI is a workflow change, not a project mutation.",
     )
 
 
