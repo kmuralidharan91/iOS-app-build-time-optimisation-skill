@@ -1,0 +1,26 @@
+{
+  "name": "ios-build-skills",
+  "owner": {
+    "name": "Muralidharan Kathiresan",
+    "email": "7802406+kmuralidharan91@users.noreply.github.com"
+  },
+  "metadata": {
+    "description": "iOS build-time optimisation skills: benchmark, diagnose, simulate, and fix Xcode/Tuist/Bazel projects.",
+    "version": "1.0.0-rc1"
+  },
+  "plugins": [
+    {
+      "name": "ios-build-skills",
+      "description": "A suite of five Agent Skills (ios-build-doctor, ios-build-measure, ios-build-diagnose, ios-build-simulate, ios-build-fix) that benchmark, diagnose, simulate, and fix iOS build-time problems across Xcode, Tuist, and Bazel projects. Recommend-first; never mutates the user's project without explicit per-finding approval.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/ios-build-doctor",
+        "./skills/ios-build-measure",
+        "./skills/ios-build-diagnose",
+        "./skills/ios-build-simulate",
+        "./skills/ios-build-fix"
+      ]
+    }
+  ]
+}

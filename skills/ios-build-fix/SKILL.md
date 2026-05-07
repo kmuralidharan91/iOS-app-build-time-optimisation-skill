@@ -1,9 +1,12 @@
 ---
 name: ios-build-fix
 description: Apply a single approved finding from ios-build-diagnose to an Xcode project on a throwaway branch, re-measure with ios-build-measure, report wall-clock delta, and refuse to claim success when the delta is null, regressive, or within variance noise. Single-fix-at-a-time; atomic git-aware (creates a branch named ios-build-fix/<rule-slug>-<timestamp>); predicted-vs-actual logged for every run. Auto-applicable v1 surface is F1 (random-sleep), F3 (sandbox+fuse via xcconfig), F4 (compilation-cache-disabled), F9 (eager-linking-disabled, designed null-delta refusal-path test); F5/F6/F7 emit a manual recipe and refuse to mutate the tree without --allow-manual. Use when the user wants a fix applied + verified end-to-end, not just predicted; refuse politely otherwise.
+disable-model-invocation: true
 ---
 
 # `ios-build-fix`
+
+> **Side-effects warning.** This skill modifies the user's Xcode project (xcconfig edits, script-phase line deletions, package-pin changes). It must only run when the user has **explicitly approved** a specific finding from `ios-build-diagnose` — typically via `ios-build-doctor`'s approval gate, or via a direct user invocation of `/ios-build-fix <rule-id>`. The Claude Code frontmatter sets `disable-model-invocation: true` so Claude will not invoke the skill autonomously. **If the agent runtime you are using does not honour `disable-model-invocation` (e.g. some Codex / Copilot / Windsurf modes), do NOT let the agent call this skill on its own — invoke it yourself after reviewing the doctor's recommendation.** All changes go to a throwaway git branch first; the fixer re-measures and refuses to claim success on null/regressive delta.
 
 Applies one diagnose finding (or a group of same-rule findings) to a real Xcode project, re-measures wall-clock via `ios-build-measure`, and emits a `fix-result.json` artifact whose `outcome` field carries the verdict honestly: `success`, `refused-null`, `refused-regressive`, `refused-noise`, `refused-apply-error`, or `refused-benchmark-error`. The fixer never claims a win when the post-fix delta is null, regressive, or within the variance threshold — that refusal is the credibility hinge for the doctor-loop demo.
 

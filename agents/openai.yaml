@@ -1,0 +1,25 @@
+name: ios-build-skills
+version: "1.0.0-rc1"
+description: >
+  iOS build-time optimisation skills: benchmark, diagnose, simulate, and fix
+  Xcode/Tuist/Bazel projects. Recommend-first; never mutates the user's
+  project without explicit per-finding approval.
+author:
+  name: Muralidharan Kathiresan
+  email: 7802406+kmuralidharan91@users.noreply.github.com
+repository: https://github.com/kmuralidharan91/iOS-app-build-time-optimisation-skill
+license: MIT
+skills:
+  - path: ./skills/ios-build-doctor
+  - path: ./skills/ios-build-measure
+  - path: ./skills/ios-build-diagnose
+  - path: ./skills/ios-build-simulate
+  - path: ./skills/ios-build-fix
+    policy:
+      requires-explicit-invocation: true
+      reason: >
+        ios-build-fix modifies the user's Xcode project (xcconfig edits,
+        script-phase line deletions, package-pin changes). Codex agents
+        must not invoke this skill autonomously; the user must invoke it
+        explicitly after reviewing a recommendation from ios-build-doctor
+        or ios-build-diagnose.
