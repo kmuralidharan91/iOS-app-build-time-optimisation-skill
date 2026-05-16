@@ -1,0 +1,10 @@
+common --enable_bzlmod
+
+build --apple_platform_type=ios
+build --ios_minimum_os=17.6
+build --apple_generate_dsym=false
+
+build:profile --noslim_profile
+
+# iOS simulator (arm64) platform
+build:ios_sim --platforms=@build_bazel_apple_support//platforms:ios_sim_arm64

@@ -17,17 +17,21 @@ Outcome enum is a strict superset of fix.py's:
 
     success | refused-null | refused-regressive | refused-noise
         | refused-apply-error | refused-benchmark-error      (verbatim from fix.py)
-    abort:non-xcode-v1-fence | abort:measure-failed
+    abort:tuist-v1-fence | abort:measure-failed
         | abort:diagnose-failed | abort:simulate-failed
         | abort:no-actionable | abort:fix-failed
         | abort:worktree-failed                              (doctor-only)
     info:user-declined | info:baseline-only                  (doctor-only)
 
+v1 ships end-to-end measurement for **Xcode and Bazel** projects; Tuist
+detection still fires the v1 fence (full Tuist end-to-end is deferred to
+v1.x once a Tuist-shaped smoke target lands — see references/defaults.md).
+
 Exit codes:
 
     0 -- success, refused-* (refusal is honest-PASS in demo terms),
          info:* (user choice / baseline-only short-circuit),
-         abort:non-xcode-v1-fence (fence firing is itself a successful run)
+         abort:tuist-v1-fence (fence firing is itself a successful run)
     1 -- any other abort:* outcome
     2 -- usage error / argparse failure
 """
@@ -74,7 +78,7 @@ DEFAULT_WORKTREE_BASE = "/tmp"
 class DoctorContext:
     # questionnaire-resolved fields (Q1..Q8)
     project_path: pathlib.Path
-    build_system: str  # detection result; v1 fence enforces "xcode"
+    build_system: str  # detection result; v1 fence allows "xcode" or "bazel"
     build_types: str  # Q3
     configuration: str  # Q4
     scheme: str  # Q5
@@ -692,12 +696,15 @@ def _write_transcript(
     # ----- 2. Build-system detection --------------------------------------
     lines.append("## 2. Build-system detection")
     lines.append("")
-    if detection == "xcode":
-        lines.append(f"`detect_build_system({ctx.project_path})` -> `\"xcode\"`  -> v1 fence PASS")
+    if detection in ("xcode", "bazel"):
+        lines.append(
+            f"`detect_build_system({ctx.project_path})` -> `\"{detection}\"`  "
+            f"-> v1 fence PASS"
+        )
     else:
         lines.append(
             f"`detect_build_system({ctx.project_path})` -> `\"{detection}\"`  "
-            f"-> v1 fence FIRED (Tuist/Bazel end-to-end is a v1.x deferral)"
+            f"-> v1 fence FIRED (Tuist end-to-end is a v1.x deferral)"
         )
     lines.append("")
 
@@ -900,7 +907,7 @@ def _exit_code_for(outcome: str) -> int:
         return 0
     if outcome.startswith("info:"):
         return 0
-    if outcome == "abort:non-xcode-v1-fence":
+    if outcome == "abort:tuist-v1-fence":
         return 0
     return 1
 
@@ -944,12 +951,12 @@ def main(argv: list[str] | None = None) -> int:
 
     # ----- Step 2: build-system detection / v1 fence -----------------------
     detection = _detect_or_confirm_build_system(ctx)
-    if detection != "xcode":
+    if detection not in ("xcode", "bazel"):
         notes.append(
             f"v1 fence fired: detect_build_system returned {detection!r}. "
-            f"Tuist/Bazel end-to-end is deferred to v1.x."
+            f"Tuist end-to-end is deferred to v1.x."
         )
-        return _finish("abort:non-xcode-v1-fence")
+        return _finish("abort:tuist-v1-fence")
 
     # ----- Step 3: measure -------------------------------------------------
     rc, measurement_path = _run_measure(ctx)

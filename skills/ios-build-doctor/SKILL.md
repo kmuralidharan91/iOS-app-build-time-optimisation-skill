@@ -1,6 +1,6 @@
 ---
 name: ios-build-doctor
-description: Orchestrate iOS build optimisation end-to-end — questionnaire, build-system detection, measure, diagnose, simulate, top-N approval prompt, fix-on-throwaway-worktree, re-measure, and a single transcript artifact suitable for a SwiftCraft-style demo. Refuses politely when the build system is not Xcode (v1 fence — emits `outcome=abort:non-xcode-v1-fence` and writes a transcript that records the fence firing) or when fix.py can't deliver (refused-* outcomes are surfaced verbatim, not masked). Manual-only rules (F5/F6/F7) are always routed through fix.py with --allow-manual so the no-op fix-result is captured for tuning data, never short-circuited to a recipe-only path. Use when the user wants the full doctor-loop in one transcript, not just one step.
+description: Orchestrate iOS build optimisation end-to-end — questionnaire, build-system detection, measure, diagnose, simulate, top-N approval prompt, fix-on-throwaway-worktree, re-measure, and a single transcript artifact suitable for a SwiftCraft-style demo. Supports Xcode and Bazel projects end-to-end as of v1.1.0; refuses politely on Tuist projects (v1 fence — emits `outcome=abort:tuist-v1-fence` and writes a transcript that records the fence firing). Bazel diagnose findings are deferred to v1.2 — measurement runs but the diagnose step short-circuits with a `diagnose-incomplete` note. When fix.py can't deliver, refused-* outcomes are surfaced verbatim, not masked. Manual-only rules (F5/F6/F7) are always routed through fix.py with --allow-manual so the no-op fix-result is captured for tuning data, never short-circuited to a recipe-only path. Use when the user wants the full doctor-loop in one transcript, not just one step.
 ---
 
 # `ios-build-doctor`
@@ -45,7 +45,7 @@ If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure
 ## Workflow
 
 1. **Resolve the questionnaire** via `_resolve_questionnaire` (CLI flags + auto-detect; see [The questionnaire](#the-questionnaire) below). Produces a `DoctorContext` carrying every answer + path.
-2. **Build-system detection**. `adapters.detect_build_system(project_path)` returns `"xcode" | "tuist" | "bazel"`. **v1 fence**: anything but `"xcode"` writes a transcript with `outcome=abort:non-xcode-v1-fence` and exits 0 — the fence firing is itself a successful doctor action.
+2. **Build-system detection**. `adapters.detect_build_system(project_path)` returns `"xcode" | "tuist" | "bazel"`. **v1 fence**: anything outside `("xcode", "bazel")` writes a transcript with `outcome=abort:tuist-v1-fence` and exits 0 — the fence firing is itself a successful doctor action. Bazel passes the fence and continues to measurement; the diagnose step short-circuits on Bazel with a `diagnose-incomplete` note (Bazel diagnose lands in v1.2).
 3. **Measure**. Subprocess `scripts/benchmark.py` into `<output-dir>/measurement/`. Non-zero exit → `outcome=abort:measure-failed`.
 4. **Goal=baseline short-circuit**. If `--goal=baseline`, write the transcript with `outcome=info:baseline-only` and exit 0 here.
 5. **Diagnose**. Subprocess `scripts/diagnose.py` into `<output-dir>/diagnosis/`. Non-zero → `abort:diagnose-failed`.
@@ -67,7 +67,7 @@ Eight numbered questions; answers populate `DoctorContext`. Auto-detect first; a
 | # | Question | Auto-detect | Ask only if | Populates |
 | --- | --- | --- | --- | --- |
 | 1 | Project location | `--project-path` flag → `pwd` fallback | flag missing AND `pwd` lacks build-system signals | `project_path` |
-| 2 | Build system | `adapters.detect_build_system(project_path)` | detector raises ambiguity | `build_system` (v1 fence: must be `"xcode"`) |
+| 2 | Build system | `adapters.detect_build_system(project_path)` | detector raises ambiguity | `build_system` (v1 fence: must be `"xcode"` or `"bazel"`) |
 | 3 | Scope (clean/incr/both) | none | always | `build_types` |
 | 4 | Configuration | none, default `Debug` | always | `configuration` |
 | 5 | Scheme/Target | `xcodebuild -list` if exactly one | scheme list ≠ 1 OR `--scheme` missing | `scheme` |
@@ -125,7 +125,7 @@ The transcript has eight sections matching the effectiveness-gate's eight bullet
 
 | Trigger | Outcome | Exit |
 | --- | --- | --- |
-| Tuist/Bazel detected | `abort:non-xcode-v1-fence` | 0 (fence firing is honest success) |
+| Tuist detected | `abort:tuist-v1-fence` | 0 (fence firing is honest success) |
 | benchmark.py exit ≠ 0 | `abort:measure-failed` | 1 |
 | diagnose.py exit ≠ 0 | `abort:diagnose-failed` | 1 |
 | simulate.py exit ≠ 0 | `abort:simulate-failed` | 1 |

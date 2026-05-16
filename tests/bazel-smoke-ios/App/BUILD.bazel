@@ -1,0 +1,12 @@
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+
+swift_library(
+    name = "SmokeLib",
+    module_name = "SmokeLib",
+    srcs = [
+        "Greeter.swift",
+        "Counter.swift",
+        "Formatter.swift",
+    ],
+    visibility = ["//visibility:public"],
+)

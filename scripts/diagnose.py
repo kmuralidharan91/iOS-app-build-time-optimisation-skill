@@ -42,7 +42,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT / "scripts"))
     sys.path.insert(0, str(_REPO_ROOT))
 
-from adapters import detect_build_system  # noqa: E402
+from adapters import PackageGraph, detect_build_system  # noqa: E402
 from adapters import xcode_adapter  # noqa: E402
 from analyzers import (  # noqa: E402
     DiagnosisContext,
@@ -177,10 +177,31 @@ def _build_context(
 
     build_system = detect_build_system(project_path)
     if build_system != "xcode":
+        # Bazel measurement ships in v1; Bazel diagnose (BUILD-file phase
+        # analyzers, bazel query for resolved settings, package_graph from
+        # the rules_swift_package_manager pin lockfile) lands in v1.x. For
+        # now, return an empty diagnosis context so the downstream
+        # analyzers all run and emit zero findings rather than crashing on
+        # an xcode_adapter call. The "diagnose-incomplete" note flows into
+        # the transcript so users know the analysis was a no-op.
         notes.append(
-            f"adapter={build_system!r} not yet implemented for diagnose; "
-            "v1 ships Xcode-only. Tuist / Bazel diagnose lands in v1.x."
+            f"adapter={build_system!r} not yet wired for diagnose; v1 ships "
+            f"Xcode-only diagnose. Bazel-side findings (BUILD script phases, "
+            f"bazel query --output=build, package_graph from rules_swift_"
+            f"package_manager pins) land in v1.x — see references/defaults.md "
+            f"'Roadmap'."
         )
+        context = DiagnosisContext(
+            project_path=project_path,
+            scheme=scheme,
+            configuration=configuration,
+            platform=platform,
+            measurement=measurement,
+            resolved_settings={},
+            script_phases=[],
+            package_graph=PackageGraph(pins=(), local_modules=()),
+        )
+        return context, notes
 
     if resolved_settings_json is not None:
         resolved = _load_resolved_settings_dump(resolved_settings_json)
