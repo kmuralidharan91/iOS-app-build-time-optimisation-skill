@@ -55,13 +55,23 @@ python3 scripts/doctor.py \
   ship `wrapped_clang_pp` binaries that hit a macOS 26 Gatekeeper kill
   for adhoc signatures.
 
-## Known limitations (deferred to v1.2)
+## Known limitations (deferred to v1.3)
 
-- The chrome-trace JSON profile is captured at
-  `<output_dir>/build-<kind>-<repeat>-profile.json` but is not yet
-  parsed for per-target critical-path attribution. `measurement.json`
-  falls back to `method=null, nodes=[]` with a "no Build Timing Summary
-  found" note. v1.2 will add a Bazel profile parser.
-- `show_build_settings`, `script_phases`, and `package_graph` for Bazel
-  remain `NotImplementedError`; `ios-build-diagnose` short-circuits on
-  Bazel projects with a `diagnose-incomplete` note.
+- The upstream rule catalog (F1–F9) is calibrated on Xcode build
+  settings. Running `ios-build-diagnose` on a Bazel project produces a
+  mix of valid findings (rules keyed on build-system-agnostic
+  attributes like `alwayslink`) and spurious findings (rules keyed on
+  Xcode-only settings like `COMPILATION_CACHE_ENABLE_CACHING`). v1.3
+  adds Bazel-specific rule variants and adjusts the catalog.
+- `fix.py` does not ship Bazel-specific fixers; the upstream
+  Xcode-side rewriters will return `refused-apply-error` against a
+  Bazel project. Bazel fixers (genrule rewriters, `MODULE.bazel`
+  patch-and-rebuild) are deferred to v1.3.
+
+## v1.2 verification (this project)
+
+- Measurement: clean 21.153 s, incremental 0.298 s.
+- Critical path: 2 nodes from `cat="critical path component"`, method=`bazel-critical-path`, longest_chain ≈ 9.6 s.
+- script_phases: 1 (the `VersionStamp` genrule), `always_out_of_date=False`.
+- package_graph: 0 pins, 0 local modules (the smoke target ships no SPM dependencies).
+- show_build_settings: 11 keys (7 from `bazel info`, 4 from `bazel cquery`).

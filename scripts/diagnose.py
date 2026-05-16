@@ -43,7 +43,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from adapters import PackageGraph, detect_build_system  # noqa: E402
-from adapters import xcode_adapter  # noqa: E402
+from adapters import bazel_adapter, xcode_adapter  # noqa: E402
 from analyzers import (  # noqa: E402
     DiagnosisContext,
     Finding,
@@ -176,20 +176,77 @@ def _build_context(
     notes: list[str] = []
 
     build_system = detect_build_system(project_path)
-    if build_system != "xcode":
-        # Bazel measurement ships in v1; Bazel diagnose (BUILD-file phase
-        # analyzers, bazel query for resolved settings, package_graph from
-        # the rules_swift_package_manager pin lockfile) lands in v1.x. For
-        # now, return an empty diagnosis context so the downstream
-        # analyzers all run and emit zero findings rather than crashing on
-        # an xcode_adapter call. The "diagnose-incomplete" note flows into
-        # the transcript so users know the analysis was a no-op.
+    if build_system == "bazel":
+        # v1.2: route Bazel projects through bazel_adapter.show_build_settings
+        # / .script_phases / .package_graph. The analyzers themselves are
+        # build-system-agnostic — they consume the dataclasses defined in
+        # adapters/__init__.py — so once these three calls return the same
+        # shapes as the Xcode counterparts, the rule fire-or-not decisions
+        # happen identically.
+        if resolved_settings_json is not None:
+            resolved = _load_resolved_settings_dump(resolved_settings_json)
+            notes.append(
+                "Loaded resolved build settings from "
+                f"{resolved_settings_json}; live bazel info/cquery not invoked."
+            )
+        elif skip_xcodebuild:
+            # Honour --skip-xcodebuild for Bazel too: it's the "don't shell
+            # out to the build system" knob the upstream CLI exposes.
+            resolved = {}
+            notes.append(
+                "--skip-xcodebuild was set; bazel info / cquery resolved-"
+                "settings findings short-circuit."
+            )
+        else:
+            resolved = bazel_adapter.show_build_settings(
+                project_path,
+                scheme=scheme,
+                configuration=configuration,
+                platform=platform,
+            )
+            if not resolved:
+                notes.append(
+                    "bazel info / cquery returned nothing (missing bazelisk "
+                    "binary, query timeout, or malformed BUILD files); "
+                    "Bazel-side build-setting findings short-circuit. Re-run "
+                    "with bazelisk on PATH or pass --resolved-settings-json "
+                    "PATH to exercise the build_setting rules."
+                )
+
+        phases = bazel_adapter.script_phases(project_path, platform=platform)
+        package_graph_value = bazel_adapter.package_graph(
+            project_path,
+            platform=platform,
+        )
         notes.append(
-            f"adapter={build_system!r} not yet wired for diagnose; v1 ships "
-            f"Xcode-only diagnose. Bazel-side findings (BUILD script phases, "
-            f"bazel query --output=build, package_graph from rules_swift_"
-            f"package_manager pins) land in v1.x — see references/defaults.md "
-            f"'Roadmap'."
+            f"adapter=bazel: diagnose surfaces wired via bazel_adapter "
+            f"(script_phases={len(phases)} genrule(s), "
+            f"package_graph.pins={len(package_graph_value.pins)}, "
+            f"package_graph.local_modules={len(package_graph_value.local_modules)}). "
+            f"Bazel-specific rules (F2/F3 BUILD-genrule variants, F8 "
+            f"oversized-module on local SPM) ship in v1.3."
+        )
+        context = DiagnosisContext(
+            project_path=project_path,
+            scheme=scheme,
+            configuration=configuration,
+            platform=platform,
+            measurement=measurement,
+            resolved_settings=resolved,
+            script_phases=phases,
+            package_graph=package_graph_value,
+        )
+        return context, notes
+
+    if build_system != "xcode":
+        # Tuist (or any future build system) still falls through here:
+        # the v1 fence in doctor.py blocks Tuist before we get this far,
+        # but benchmark.py can route diagnose against a Tuist project
+        # directly, so we keep the safe short-circuit.
+        notes.append(
+            f"adapter={build_system!r} not yet wired for diagnose; v1.2 "
+            f"ships Xcode + Bazel diagnose. Tuist diagnose lands in v1.x "
+            f"once a Tuist-shaped smoke target is on disk."
         )
         context = DiagnosisContext(
             project_path=project_path,

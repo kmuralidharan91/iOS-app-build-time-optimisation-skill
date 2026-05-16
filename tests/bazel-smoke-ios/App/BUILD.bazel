@@ -1,5 +1,15 @@
 load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
 
+# Stand-in for an Xcode "Run Script" build phase. bazel_adapter
+# .script_phases() should detect this genrule and expose it as a
+# ScriptPhase entry. This one is well-behaved (declared `outs`); the
+# analyzer should produce zero findings.
+genrule(
+    name = "VersionStamp",
+    outs = ["version.txt"],
+    cmd = "date -u +%Y%m%d%H%M%S > $@",
+)
+
 swift_library(
     name = "SmokeLib",
     module_name = "SmokeLib",

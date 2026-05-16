@@ -2,7 +2,7 @@
 
 > **Benchmark, diagnose, simulate, and fix iOS build-time problems** across Xcode, Tuist, and Bazel — recommend-first, citation-required, refuses to claim wins it can't measure.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-1.1.0-brightgreen.svg)](CHANGELOG.md) [![Agent Skills](https://img.shields.io/badge/agent--skills-open%20standard-orange.svg)](https://agentskills.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-1.2.0-brightgreen.svg)](CHANGELOG.md) [![Agent Skills](https://img.shields.io/badge/agent--skills-open%20standard-orange.svg)](https://agentskills.io)
 
 Five [Agent Skills](https://agentskills.io) for Claude Code, Cursor, GitHub Copilot, OpenAI Codex, and Windsurf.
 
@@ -175,17 +175,17 @@ Every change goes to a throwaway git branch. Re-measure runs after. Refuses on n
 
 - **NetNewsWire** @ `build-comparison-base` (upstream: [Ranchero-Software/NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)) — pure Xcode + F3/F4/F9 fix-apply target. On a 28-second baseline all three rules refused to claim measurable wins; variance noise dominated. That refusal is the gate working as designed (see [Why "refused" is the headline feature](#why-refused-is-the-headline-feature)).
 - **Wikipedia-iOS** @ [`9200297c15`](https://github.com/wikimedia/wikipedia-ios/commit/9200297c15) — pure Xcode + Tuist-migration POC at `113cbb6f26`. The same rules predict 45 %+ clean-build improvements on the larger codebase.
-- **Bazel** (v1.1.0) — `bazel_adapter.measure()` ships end-to-end against [`tests/bazel-smoke-ios/`](tests/bazel-smoke-ios/) (3-file Swift library smoke target; clean 21.153 s, incremental 0.298 s after touch). Diagnose / fix Bazel surfaces are deferred to v1.2.
+- **Bazel** (v1.2.0) — full diagnose surface ships end-to-end against [`tests/bazel-smoke-ios/`](tests/bazel-smoke-ios/). Measurement: clean 21.153 s, incremental 0.298 s after touch. Critical path: parsed from the chrome-trace profile (method=`bazel-critical-path`). Diagnose: `script_phases` from `bazel query --output=xml`, `package_graph` from `Package.resolved` + local `Package.swift`, `show_build_settings` from `bazel info` + `bazel cquery --output=jsonproto`. Bazel-specific rule variants land in v1.3.
 
-## Roadmap (v1.2)
+## Roadmap (v1.3)
 
-Annotated `(deferred to v1.2)` in [`references/defaults.md`](references/defaults.md); full notes in [`CHANGELOG.md`](CHANGELOG.md).
+Annotated `(deferred to v1.3)` in [`references/defaults.md`](references/defaults.md); full notes in [`CHANGELOG.md`](CHANGELOG.md).
 
 - **F1 magnitude** — neither corpus has a `sleep $RANDOM` pattern; awaits a triggering project.
 - **F2 measured Δ** — ships as informational manual recipe; auto-apply Δ awaits a triggering artifact-upload phase.
 - **F6 magnitude** — neither corpus pulls swift-syntax; awaits a macro-using project.
-- **Bazel critical-path attribution** — parse `--profile=<json>` chrome-trace `traceEvents[]` for per-target DAG (v1.1 captures the JSON but does not yet parse it).
-- **Bazel diagnose** — `show_build_settings` via `bazel query`, `script_phases` from BUILD files, `package_graph` from `rules_swift_package_manager` pins.
+- **Bazel-specific rule variants** — upstream rules (F1–F9) are still calibrated on Xcode settings. On a Bazel project they fire a mix of valid + spurious findings; v1.3 adjusts the catalog with Bazel-specific equivalents.
+- **Bazel-specific fixers** — `fix.py` is Xcode-only. v1.3 adds genrule rewriters and `MODULE.bazel` patch-and-rebuild.
 - **Tuist end-to-end** — `tuist_adapter.measure()` against a Tuist-shaped smoke target.
 - **Visual assets** (banner, doctor-loop GIF, screenshot) — v1.0.1 patch.
 
