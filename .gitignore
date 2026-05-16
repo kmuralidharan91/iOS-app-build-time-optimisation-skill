@@ -21,16 +21,13 @@ venv/
 /tmp-scratch/
 
 # Xcode result bundles produced by smoke runs are large binary blobs.
-# We commit the parsed timing summaries (in *.log files) and the
-# measurement.json artifact instead; the bundles are reproducible by
-# re-running scripts/benchmark.py against the worktree HEAD recorded
-# in the artifact's project.git_sha.
 *.xcresult/
 
-# Full xcodebuild stdout per-run logs are large (~40MB each, ~600MB
-# total across one chat's smoke). Compact <run>-timing-summary.txt
-# files extracted alongside each log are kept; the full logs are not.
+# Full xcodebuild stdout per-run logs are large (~40MB each).
 docs/smoke/**/runs-*/build-clean-*.log
 docs/smoke/**/runs-*/build-incremental-*.log
-build-benchmarks/**/runs-*/build-clean-*.log
-build-benchmarks/**/runs-*/build-incremental-*.log
+
+# Benchmark artifacts: machine-specific runtime outputs containing absolute
+# filesystem paths (project_root, result_bundle_path, etc.). Never commit —
+# regenerate locally via scripts/benchmark.py instead.
+/build-benchmarks/
