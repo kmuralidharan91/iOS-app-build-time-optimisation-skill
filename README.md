@@ -91,7 +91,7 @@ NetNewsWire F3 / F4 / F9 — **all three refused to claim success**:
 | F4 (`build-setting/compilation-cache-disabled`) | `refused-noise` | −1.32 s (in variance) | +10.86 s |
 | F9 (`build-setting/eager-linking-disabled`) | `refused-regressive` | +3.47 s | +2.06 s |
 
-Source: [`fix-F3`](build-benchmarks/netnewswire/fix-F3/fix-result.json), [`fix-F4`](build-benchmarks/netnewswire/fix-F4/fix-result.json), [`fix-F9`](build-benchmarks/netnewswire/fix-F9/fix-result.json).
+Numbers above are from running this skill against [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire) at tag `build-comparison-base`, iPhone 17 simulator, Xcode 26.4.1, n=3 repeats per axis. Reproduce on your machine by cloning the same tag and running `ios-build-fix` — the skill writes `build-benchmarks/<project>/{diagnose,fix-F*}/*.json` into your local (gitignored) working tree so you can compare your hardware's measurements against the table above.
 
 These fixes have known wins on larger projects. On a 28-second baseline, the variance floor wins. Refusing on noise is by design.
 

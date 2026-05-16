@@ -28,17 +28,22 @@ project shape. v1.0.0 evidence: both Wikipedia-iOS@`9200297c15`
 (`docs/wikipedia-ios-analysis.md:87`) and NetNewsWire@`build-comparison-base`
 (`docs/netnewswire-analysis.md:89`) ship with
 `COMPILATION_CACHE_ENABLE_CACHING` **unset** (universal miss confirms
-the rule fires). Measured warm-cache Δ on NetNewsWire ships in
-`build-benchmarks/netnewswire/fix-F4/fix-result.json` (Phase B step 14).
+the rule fires). Measured warm-cache Δ on NetNewsWire@`build-comparison-base`:
+clean −1.32 s (within variance), incremental +10.86 s. Reproducible by
+running `ios-build-fix` with rule `build-setting/compilation-cache-disabled`
+against [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire) and
+inspecting the generated `fix-F4/fix-result.json` artifact in your local
+`build-benchmarks/` tree.
 
 **Risk.** Incremental builds can pay a small cache-invalidation cost
 (~10 s extra on touched-file change observed during development)
 because the cache sees a wider invalidation cone than Xcode's
 per-target incremental tracker. Track the per-project trade-off rather
 than enabling blindly; the fixer's re-measure step refuses to claim
-success when net Δ is null/regressive (see
-`build-benchmarks/netnewswire/fix-F4/fix-result.json` for the v1.0.0
-data point).
+success when net Δ is null/regressive (see the locally-generated
+`fix-F4/fix-result.json` after running `ios-build-fix` for the v1.0.0
+NetNewsWire data point: incremental Δ +10.86 s is the cache-invalidation
+cone in action).
 
 ## `EAGER_LINKING`
 
@@ -62,8 +67,12 @@ both Wikipedia-iOS@`9200297c15` (`docs/wikipedia-ios-analysis.md:86`)
 and NetNewsWire@`build-comparison-base`
 (`docs/netnewswire-analysis.md:88`) ship with `EAGER_LINKING` unset
 (universal miss). The designed null-delta refusal-path test on
-NetNewsWire ships in `build-benchmarks/netnewswire/fix-F9/fix-result.json`
-(expected `outcome=refused-null`; Phase B step 14).
+NetNewsWire is reproducible by running `ios-build-fix` with rule
+`build-setting/eager-linking-disabled` against
+[NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)@`build-comparison-base`
+(expected outcome: `refused-regressive` on a 28 s baseline where the
+variance floor exceeds the scheduling-only optimisation; v1.0.0 measured
+clean Δ +3.47 s, incremental Δ +2.06 s).
 
 **Risk.** Almost none — the optimisation only changes scheduling.
 The mitigation when impact is null is to revert; the
@@ -117,8 +126,12 @@ shell-startup time across the phase chain. Project-shape sensitive.
 v1.0.0 reference counts: Wikipedia-iOS@`9200297c15` = 6 phases,
 NetNewsWire@`build-comparison-base` = 8 phases. Per-phase magnitude
 once the F3 prerequisite (correct input/output declarations) is applied
-ships in `build-benchmarks/netnewswire/fix-F3/fix-result.json` (Phase B
-step 14).
+is reproducible by running `ios-build-fix` with rule
+`script-phase/missing-output-declarations` against
+[NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)@`build-comparison-base`
+(v1.0.0 outcome: `refused-regressive`; clean Δ +6.31 s, incremental Δ
++2.92 s — the 28 s baseline variance floor exceeds the per-phase win on
+this small project).
 
 **Risk.** WWDC22 110364, verbatim:
 

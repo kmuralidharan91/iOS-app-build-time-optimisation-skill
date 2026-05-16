@@ -24,13 +24,18 @@ projects:
   honestly refused to claim success** because the variance noise on a
   28-second baseline exceeded the predicted-win magnitude:
   - F3 (fuse-only): `refused-regressive` (clean +6.31 s, incremental
-    +2.92 s) — see `build-benchmarks/netnewswire/fix-F3/fix-result.json`.
+    +2.92 s; reproduce by running `ios-build-fix` with rule
+    `script-phase/missing-output-declarations` against
+    [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)@`build-comparison-base`).
   - F4 (compilation-cache): `refused-noise` (clean −1.32 s within
-    variance, incremental +10.86 s expected regression) — see
-    `build-benchmarks/netnewswire/fix-F4/fix-result.json`.
+    variance, incremental +10.86 s expected regression; reproduce by
+    running `ios-build-fix` with rule
+    `build-setting/compilation-cache-disabled` against
+    [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)@`build-comparison-base`).
   - F9 (eager-linking, designed null-delta): `refused-regressive`
-    (clean +3.47 s, incremental +2.06 s) — see
-    `build-benchmarks/netnewswire/fix-F9/fix-result.json`.
+    (clean +3.47 s, incremental +2.06 s; reproduce by running
+    `ios-build-fix` with rule `build-setting/eager-linking-disabled`
+    against [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)@`build-comparison-base`).
 
   These refusals are evidence that the fixer's `refuse-on-noise` /
   `refuse-on-regression` gate behaves correctly: the same fixes have

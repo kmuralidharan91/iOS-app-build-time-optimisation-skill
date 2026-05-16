@@ -9,18 +9,22 @@
 > against an internal iOS app and re-cited for the public release
 > against measurements on:
 >
-> - **Wikipedia-iOS** at baseline tag `build-comparison-base`
->   (`9200297c15`) — pure-Xcode `Wikipedia` and `Experimental` schemes;
->   plus a Tuist-migration POC at commit `113cbb6f26`. Source artefacts:
->   `build-benchmarks/wikipedia-ios/{xcode-wikipedia-scheme-baseline,tuist}/*.json`
->   + `docs/wikipedia-ios-analysis.md` + `build-benchmarks/wikipedia-ios/comparison-report.md` (§8 verification log).
-> - **NetNewsWire** at `build-benchmarks/netnewswire/20260503T145153Z-netnewswire-ios.json`
->   — pure-Xcode second data point + the F3/F4/F9 fix-apply target.
->   Diagnostics in `docs/netnewswire-analysis.md`.
+> - **Wikipedia-iOS** at baseline commit
+>   [`9200297c15`](https://github.com/wikimedia/wikipedia-ios/commit/9200297c15)
+>   — pure-Xcode `Wikipedia` and `Experimental` schemes; plus a
+>   Tuist-migration POC at commit `113cbb6f26`. Analysis in
+>   `docs/wikipedia-ios-analysis.md`. Reproduce by cloning
+>   [wikimedia/wikipedia-ios](https://github.com/wikimedia/wikipedia-ios)
+>   at that commit and running `ios-build-doctor`.
+> - **NetNewsWire** at tag `build-comparison-base`
+>   ([upstream](https://github.com/Ranchero-Software/NetNewsWire)) —
+>   pure-Xcode second data point + the F3/F4/F9 fix-apply target.
+>   Diagnostics in `docs/netnewswire-analysis.md`. Reproduce by cloning
+>   the upstream at that tag and running `ios-build-doctor` /
+>   `ios-build-fix`.
 > - **Bazel evidence** is qualitative-only in v1.0.0 (the Wikipedia-iOS
->   Bazel POC is paused at the WMFData `apple_core_data_model` blocker;
->   `build-benchmarks/wikipedia-ios/bazel/progress.md`). Measured Bazel
->   numbers ship in v1.x once the blocker resolves.
+>   Bazel POC is paused at the WMFData `apple_core_data_model` blocker).
+>   Measured Bazel numbers ship in v1.x once the blocker resolves.
 >
 > A small set of items remains **deferred to v1.1** with explicit
 > annotations below: F1 (random-sleep — no triggering pattern observed
@@ -118,8 +122,10 @@ existence of the pin is the trigger.
 external SPM pins are Sparkle / PLCrashReporter / Tidemark / Zip
 (`docs/netnewswire-analysis.md:103-107`); Wikipedia-iOS's Tuist-cached
 17 external xcframeworks are CocoaLumberjack / RxSwift / SDWebImage /
-HCaptcha / Logging / WMF* (`build-benchmarks/wikipedia-ios/comparison-report.md`
-lines 70-74). The rule's *detection* (presence of the pin) is correct
+HCaptcha / Logging / WMF* (verifiable by running `ios-build-doctor`
+against [wikipedia-ios](https://github.com/wikimedia/wikipedia-ios)@`9200297c15`
+and inspecting the generated diagnose artifact's `external_packages`
+field). The rule's *detection* (presence of the pin) is correct
 by construction; the *magnitude* citation is **deferred to v1.1**
 against a project that actually pulls swift-syntax (e.g. a SwiftFormat
 - or SwiftFormat-using app). The Xcode 26 prebuilt-syntax mechanism is
@@ -182,8 +188,8 @@ the human-facing table.
 | `script-phase/missing-debug-guard` | (deferred to v1.1) — informational manual recipe in v1.0.0 surface; no triggering artifact-upload phase observed in Wikipedia-iOS or NetNewsWire. Estimated ~1.5 s per finding aggregated | same — guard fires regardless of clean/incremental |
 | `script-phase/missing-output-declarations` | measured-on-wikipedia-ios@`9200297c15` (5 of 6 phases `alwaysOutOfDate=1`; PhaseScriptExecution 6.54 s clean / 5.82 s incremental — 39 % of wall-clock). Per-phase estimate kept at ~4 s ±1 (conservative upper bound; Wikipedia mean is ~2.18 s/phase but development-time heavier-body phases set the bound). Sum capped at `sqrt(N)×4` to model post-sandbox+fuse parallel fan-out | same shape; cap applies symmetrically |
 | `script-phase/swiftlint-on-build` | measured-on-wikipedia-ios@`9200297c15` — 3× SwiftLint phases on Wikipedia/Staging/Experimental targets, PhaseScriptExecution 5.82 s incremental = 39 % of wall-clock = 22× the SwiftCompile of the touched file (`docs/wikipedia-ios-analysis.md:55,76`). Estimate kept at ~3 s clean / ~2 s incremental (1–6 range) per-phase; heuristic, project-shape sensitive | measured-on-wikipedia-ios@`9200297c15` ~2 s per finding |
-| `build-setting/compilation-cache-disabled` | measured-on-wikipedia-ios@`9200297c15` + netnewswire@`build-comparison-base` — both ship with `COMPILATION_CACHE_ENABLE_CACHING` unset (universal miss; `wikipedia-ios-analysis.md:87`, `netnewswire-analysis.md:89`). Warm-cache clean improvement estimate kept at ~45 % on a baseline that does not yet enable caching; when `measurement.json` supplies a project baseline, prediction scales to that baseline. Measured Δ ships in `build-benchmarks/netnewswire/fix-F4/fix-result.json` (step 14 of Phase B) | measured-on-wikipedia-ios + netnewswire — incremental regression cost ~10 s positive (cache invalidation cone wider than Xcode's incremental tracker) |
-| `build-setting/eager-linking-disabled` | measured-on-wikipedia-ios@`9200297c15` + netnewswire@`build-comparison-base` — both ship with `EAGER_LINKING` unset (universal miss; `wikipedia-ios-analysis.md:86`, `netnewswire-analysis.md:88`). Predicted near-zero with ±8 s spread to surface low confidence; the fixer must refuse on null delta. Designed null-delta refusal-path test ships in `build-benchmarks/netnewswire/fix-F9/fix-result.json` (step 14) | 0 s ±0 — eager linking affects scheduling, not incremental wall-clock |
+| `build-setting/compilation-cache-disabled` | measured-on-wikipedia-ios@`9200297c15` + netnewswire@`build-comparison-base` — both ship with `COMPILATION_CACHE_ENABLE_CACHING` unset (universal miss; `wikipedia-ios-analysis.md:87`, `netnewswire-analysis.md:89`). Warm-cache clean improvement estimate kept at ~45 % on a baseline that does not yet enable caching; when `measurement.json` supplies a project baseline, prediction scales to that baseline. Measured Δ reproducible by running `ios-build-fix` against [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)@`build-comparison-base` (v1.0.0: clean −1.32 s within variance, incremental +10.86 s cache-invalidation cost) | measured-on-wikipedia-ios + netnewswire — incremental regression cost ~10 s positive (cache invalidation cone wider than Xcode's incremental tracker) |
+| `build-setting/eager-linking-disabled` | measured-on-wikipedia-ios@`9200297c15` + netnewswire@`build-comparison-base` — both ship with `EAGER_LINKING` unset (universal miss; `wikipedia-ios-analysis.md:86`, `netnewswire-analysis.md:88`). Predicted near-zero with ±8 s spread to surface low confidence; the fixer must refuse on null delta. Designed null-delta refusal-path test reproducible by running `ios-build-fix` against [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)@`build-comparison-base` (v1.0.0: `refused-regressive`, clean Δ +3.47 s, incremental Δ +2.06 s — variance floor on a 28 s baseline) | 0 s ±0 — eager linking affects scheduling, not incremental wall-clock |
 | `build-setting/script-sandboxing-disabled` (PR-#2) | WWDC22 110364: indirect; estimate=null; wins materialise via `FUSE_BUILD_SCRIPT_PHASES` once enabled | same |
 | `build-setting/fuse-build-script-phases-disabled` (PR-#2) | WWDC22 110364: heuristic 0.5 s clean / 0.4 s incremental per phase × project phase count. Wikipedia-iOS@`9200297c15` reference count = 6 phases; NetNewsWire@`build-comparison-base` = 8 phases. Heuristic, project-shape sensitive | same — heuristic, project-shape sensitive |
 | `asset-catalog/incremental-recompile` | Incremental-only — predicted 0 s clean (asset catalog always compiles cold; reference Wikipedia 53.86 s / 4 catalogs and NetNewsWire 15.35 s / 3 catalogs both fall in the cold budget) | measurement.json `incremental.critical_path.nodes` `CompileAssetCatalogVariant` duration_seconds — predictor uses literal node duration when supplied. Fallback reference value tuned during development; both v1.0.0 corpora's incremental runs were below the 3.0 s threshold (negative controls) |
