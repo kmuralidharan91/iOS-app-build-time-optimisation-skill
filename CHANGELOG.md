@@ -4,6 +4,103 @@ All notable changes to this project. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-16
+
+### Added
+
+- **Bazel critical-path attribution from the chrome-trace profile.**
+  `scripts/critical_path.py` parses the JSON profile that
+  `bazelisk build --profile=<json>` writes alongside the stdout log.
+  Prefers events with `cat == "critical path component"` (Bazel's
+  server-side critical-path output, ordered by the action DAG); falls
+  back to top `cat == "action processing"` events ranked by wall-clock
+  on tiny builds. Method names: `bazel-critical-path` (preferred) and
+  `bazel-action-ranked` (fallback). Verified against
+  `tests/bazel-smoke-ios/`: clean run → 2 critical-path nodes with
+  `longest_chain_seconds ≈ 9.6 s`.
+- **`bazel_adapter.script_phases()` implementation.** Wraps
+  `bazel query 'kind(genrule, //...)' --output=xml`, parses the result,
+  and exposes each genrule as a `ScriptPhase` (target, name, script
+  body, srcs, outs, always_out_of_date flag, BUILD.bazel:line:col
+  location). `always_out_of_date` fires when the genrule tags include
+  `no-cache`/`no-remote-cache`/`local` OR when it declares no outs.
+  Verified against the smoke target's `//App:VersionStamp` genrule.
+- **`bazel_adapter.package_graph()` implementation.** Walks the project
+  tree for `Package.resolved` files (workspace-level + per-package),
+  extracts pins (SPM v2 and v3 schemas), and walks `Package.swift`
+  manifests for local module Swift-file counts. Verified against
+  `wikipedia-ios-bazel`: 10 pins + 7 local modules.
+- **`bazel_adapter.show_build_settings()` implementation.** Combines
+  `bazel info` (workspace facts: release, execution_root, output_path,
+  etc.) with `bazel cquery <target> --output=jsonproto` (per-target
+  attributes that matter for the v1 rules: compilation_mode, copts,
+  swiftcopts, features, module_name, alwayslink, enable_modules,
+  generates_header, library_evolution). Keys are namespaced (`bazel.info.*`,
+  `bazel.target.*`) so the upstream build_setting analyzer can tell
+  them apart from xcodebuild keys.
+- **`ios-build-diagnose` now runs end-to-end on Bazel projects.**
+  Routes `build_system == "bazel"` through the three adapter surfaces
+  above. Honours `--skip-xcodebuild` (renamed semantically to "skip
+  build-system invocation") and `--resolved-settings-json`. The
+  analyzers themselves are build-system-agnostic — they consume the
+  dataclasses defined in `adapters/__init__.py` — so once the adapter
+  returns the same shapes, rules fire identically.
+
+### Known limitations (deferred to v1.3)
+
+- The upstream rules (F1–F9) are calibrated on Xcode build settings;
+  on a Bazel project they will produce a mix of valid findings (when
+  the rule keys off a build-system-agnostic attribute like
+  `alwayslink`) and spurious findings (when it keys off an
+  Xcode-only setting like `COMPILATION_CACHE_ENABLE_CACHING`). v1.3
+  will add Bazel-specific rule variants and adjust the rule catalog
+  accordingly.
+- Bazel-specific fixers are still out of scope for `fix.py`.
+  `--rule-id` on `doctor.py --goal apply` against a Bazel project
+  still returns `refused-apply-error` for Xcode-only fixers.
+
+## [1.1.0] — 2026-05-16
+
+### Added
+
+- **Bazel measurement adapter ships end-to-end.** `bazel_adapter.measure()` now
+  wraps `bazelisk build --profile=<path>` (chrome-trace JSON profile capture)
+  with `time.monotonic` wall-clock and returns a `TimedBuild` shaped identically
+  to the xcode adapter's output. Verified against a synthetic Bazel iOS smoke
+  target (`SmokeLib` Swift library, 3 sources): clean median 21.153 s,
+  incremental median 0.298 s after `touch_file.touch()`. The
+  `--scheme` CLI flag accepts a Bazel target label (e.g. `//App:SmokeLib`);
+  `--configuration` maps to `bazelisk --config=<name>`; `--destination` is
+  xcodebuild-specific and is ignored with a logged note.
+- **`ios-build-doctor` v1 fence relaxed for Bazel.** `detect_build_system()`
+  returning `"bazel"` no longer fires the fence. The outcome string renamed
+  from `abort:non-xcode-v1-fence` to `abort:tuist-v1-fence`; the fence still
+  fires for Tuist (full Tuist end-to-end is deferred to v1.x once a Tuist-shaped
+  smoke target lands).
+- **`ios-build-diagnose` short-circuits gracefully on Bazel.** Returns an empty
+  `DiagnosisContext` plus a `diagnose-incomplete` note explaining that
+  BUILD-file script-phase analysis, `bazel query --output=build` resolved
+  settings, and package-graph extraction from `rules_swift_package_manager`
+  pins are deferred to v1.x.
+
+### Verification corpus
+
+- `tests/bazel-smoke-ios/` — minimal Bazel iOS smoke target. Reproduce with:
+  `python3 scripts/benchmark.py --project-path tests/bazel-smoke-ios --scheme //App:SmokeLib --configuration ios_sim --destination "" --build-types clean,incremental --touch-file tests/bazel-smoke-ios/App/Counter.swift --repeats 3 --output-dir /tmp/bazel-out/`.
+
+### Deferred to v1.2
+
+- Bazel-side critical-path attribution from the chrome-trace JSON profile
+  (per-target wall-clock DAG via `traceEvents[]` flow events). v1.1 captures
+  the profile JSON alongside the stdout log but does not yet parse it.
+- Bazel measured benchmarks on wikipedia-ios: paused at WMFData
+  `apple_core_data_model` (resolved 2026-05-16, see
+  `bazel/progress.md`) plus Swift→Obj-C module-map work for the legacy WMF
+  Framework target. Telegram-iOS remains the eventual large-corpus smoke
+  target once an Xcode-26.4-pinned environment is available.
+- Bazel diagnose (`show_build_settings`, `script_phases`, `package_graph`).
+- Tuist end-to-end (`tuist_adapter.measure()`).
+
 ## [1.0.0] — 2026-05-07
 
 Phase B closed Phase A's `TODO(public-cite: <project>)` markers (175 total)

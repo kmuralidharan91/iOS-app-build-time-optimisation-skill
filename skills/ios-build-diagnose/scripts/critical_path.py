@@ -1,31 +1,33 @@
-"""Critical-path attribution for an Xcode build.
+"""Critical-path attribution for Xcode and Bazel builds.
 
-**Phase A scope.** This module parses the ``Build Timing Summary`` block
+**Xcode path (v1.0).** Parses the ``Build Timing Summary`` block
 emitted by ``xcodebuild -showBuildTimingSummary`` and turns the
 task-class aggregates (e.g. ``SwiftCompile (2465 tasks) | 2538.981
 seconds``) into a populated ``critical_path`` field on the benchmark
 artifact. Each task class is reported as one node ranked by duration;
 ``longest_chain_seconds`` is the duration of the dominant task class.
 
-Per-target attribution and a true dependency-DAG walk would need to
-parse the 14000+ ActivityLogCommandInvocationSection entries inside
-the ``.xcresult`` bundle (verified against a development-time baseline:
-xcresulttool 24757, schema 0.1.0, ~14865 top-level command invocations
-on a single Build action — not grouped by target). Equivalent
-top-level command counts on the v1.0.0 corpora ship in
-``build-benchmarks/{wikipedia-ios,netnewswire}/`` xcresult bundles.
-That work is deferred alongside the diagnose pass, which already
-needs to walk per-target build settings and script phases.
+**Bazel path (v1.2).** Parses the chrome-trace JSON profile written by
+``bazelisk build --profile=<path>``. ``cat=critical path component``
+events are extracted in trace order as the authoritative critical path
+(Bazel computes this server-side from the action DAG); when the
+profile is too small to surface multiple critical-path components,
+falls back to ``cat=action processing`` events ranked by wall-clock as
+a task-list attribution. See
+https://bazel.build/advanced/performance/json-trace-profile for the
+profile schema.
 
-Two parsing inputs are accepted, in order of preference:
+Parsing inputs (in order of preference):
 
-1. The xcodebuild stdout log (already on disk because xcode_adapter
-   writes it). Contains the ``Build Timing Summary`` block verbatim.
-2. The ``.xcresult`` bundle. We probe it for the same Build Timing
-   Summary subsection via ``xcrun xcresulttool get --legacy``; if the
-   bundle is unreachable or schema-drifted, we fall back to stdout.
+1. The xcodebuild stdout log (Xcode). Contains the ``Build Timing
+   Summary`` block verbatim.
+2. The Bazel chrome-trace profile sibling of the log (``<log>``
+   replaced by ``<log_basename-without-.log>-profile.json``). Detected
+   by the ``otherData.bazel_version`` marker at the top of the JSON.
+3. The ``.xcresult`` bundle (Xcode fallback). Probed via
+   ``xcrun xcresulttool get --legacy``.
 
-If both are missing, ``critical_path`` is returned with ``method=None``
+If none yield data, ``critical_path`` is returned with ``method=None``
 and an explanatory note.
 """
 
@@ -109,6 +111,114 @@ def parse_xcresult_timing_summary(
     return out
 
 
+def _bazel_profile_path_for_log(log_path: pathlib.Path) -> pathlib.Path:
+    """Return the expected Bazel chrome-trace profile sibling of ``log_path``.
+
+    ``bazel_adapter.measure`` writes ``build-<kind>-<repeat>.log`` and
+    ``build-<kind>-<repeat>-profile.json`` side by side.
+    """
+
+    return log_path.with_name(log_path.stem + "-profile.json")
+
+
+def parse_bazel_profile_critical_path(
+    profile_path: pathlib.Path,
+    max_action_nodes: int = 20,
+) -> tuple[list[CriticalPathNode], float, str] | None:
+    """Parse a Bazel chrome-trace JSON profile into a critical-path attribution.
+
+    Preference order inside the profile:
+
+    1. Events with ``cat == "critical path component"``. Bazel computes
+       these server-side from the action DAG; their wall-clock sum is the
+       authoritative critical-path length. They arrive in trace order
+       (which mirrors graph order), so we keep that ordering.
+    2. Events with ``cat == "action processing"`` ranked by ``dur``. Used
+       only when (1) yields fewer than 2 entries (very small builds), so
+       the surfaced attribution remains useful for tiny smoke targets.
+
+    Returns ``(nodes, longest_chain_seconds, method)`` or ``None`` when
+    the file is unreadable or contains no usable events.
+    """
+
+    try:
+        text = profile_path.read_text()
+    except OSError:
+        return None
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(data, dict):
+        return None
+    if "bazel_version" not in (data.get("otherData") or {}):
+        return None
+    events = data.get("traceEvents", [])
+    if not isinstance(events, list):
+        return None
+
+    def _us_to_seconds(us: int | float) -> float:
+        return float(us) / 1_000_000.0
+
+    cp_events: list[tuple[str, float]] = []
+    action_events: list[tuple[str, float]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        if event.get("ph") != "X":
+            continue
+        dur = event.get("dur")
+        name = event.get("name")
+        cat = event.get("cat")
+        if dur is None or not isinstance(name, str):
+            continue
+        seconds = _us_to_seconds(dur)
+        if cat == "critical path component":
+            # Strip the "action '...'" wrapper Bazel emits so the node
+            # surface is comparable to xcodebuild's task classes.
+            stripped = name
+            if stripped.startswith("action '") and stripped.endswith("'"):
+                stripped = stripped[len("action '") : -1]
+            cp_events.append((stripped, seconds))
+        elif cat == "action processing":
+            action_events.append((name, seconds))
+
+    if len(cp_events) >= 2:
+        nodes = [
+            CriticalPathNode(
+                target=name,
+                duration_seconds=seconds,
+                depth=rank,
+                dominant_task=name,
+                predecessors=[],
+            )
+            for rank, (name, seconds) in enumerate(cp_events)
+        ]
+        return nodes, sum(s for _, s in cp_events), "bazel-critical-path"
+
+    # Fallback: rank action_processing events by duration. Useful for
+    # smoke targets where Bazel's own critical-path output is too small.
+    if action_events:
+        action_events.sort(key=lambda row: row[1], reverse=True)
+        top = action_events[:max_action_nodes]
+        nodes = [
+            CriticalPathNode(
+                target=name,
+                duration_seconds=seconds,
+                depth=rank,
+                dominant_task=name,
+                predecessors=[],
+            )
+            for rank, (name, seconds) in enumerate(top)
+        ]
+        longest = top[0][1] if top else 0.0
+        return nodes, longest, "bazel-action-ranked"
+
+    return None
+
+
 def derive_critical_path(
     bundle_path: pathlib.Path | None,
     log_path: pathlib.Path | None,
@@ -123,6 +233,30 @@ def derive_critical_path(
         aggregates = parse_log_timing_summary(log_path)
         if aggregates:
             source = "stdout-log"
+
+    # Bazel: parse the chrome-trace profile alongside the log. Done
+    # before the xcresult fallback because the profile lives where the
+    # log does (sibling file), and the xcresult fallback is xcode-only.
+    if not aggregates and log_path is not None:
+        profile_path = _bazel_profile_path_for_log(log_path)
+        if profile_path.exists():
+            bazel_result = parse_bazel_profile_critical_path(profile_path)
+            if bazel_result is not None:
+                nodes, longest, method = bazel_result
+                notes.append(
+                    "method=" + method + ": nodes are Bazel "
+                    + ("critical-path components" if method == "bazel-critical-path"
+                       else "action_processing events ranked by wall-clock") + " "
+                    "from `bazelisk build --profile=<json>` — see "
+                    "https://bazel.build/advanced/performance/json-trace-profile"
+                )
+                notes.append(f"timing profile source: {profile_path}")
+                return CriticalPath(
+                    method=method,
+                    nodes=nodes,
+                    longest_chain_seconds=longest,
+                    notes=notes,
+                )
 
     if not aggregates and bundle_path is not None and bundle_path.exists():
         aggregates = parse_xcresult_timing_summary(bundle_path)
