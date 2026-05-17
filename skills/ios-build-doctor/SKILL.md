@@ -1,6 +1,6 @@
 ---
 name: ios-build-doctor
-description: Orchestrate iOS build optimisation end-to-end — questionnaire, build-system detection, measure, diagnose, simulate, top-N approval prompt, fix-on-throwaway-worktree, re-measure, and a single transcript artifact suitable for a SwiftCraft-style demo. Supports **Xcode, Bazel, and Tuist** projects end-to-end as of v1.3.0; Tuist routes through `tuist_adapter` (which owns `tuist generate` and delegates to `xcode_adapter` against the generated workspace), Bazel routes through `bazel_adapter`, Xcode is the canonical path. F1–F9 rules fire identically across build systems where the underlying concept applies; Xcode-only build settings (F4 / F9 / sandboxing / fuse) are suppressed on Bazel projects so no spurious findings surface. Bazel-aware F1/F3 fixers ship as informational stubs with manual recipes in v1.3; buildozer-backed BUILD.bazel auto-apply lands in v1.4. When fix.py can't deliver, refused-* outcomes are surfaced verbatim, not masked. Manual-only rules (F5/F6/F7) are always routed through fix.py with --allow-manual so the no-op fix-result is captured for tuning data, never short-circuited to a recipe-only path. Use when the user wants the full doctor-loop in one transcript, not just one step.
+description: Orchestrate iOS build optimisation end-to-end — questionnaire, build-system detection, measure, diagnose, simulate, top-N approval prompt, fix-on-throwaway-worktree, re-measure, and a single transcript artifact suitable for a live walkthrough. Supports **Xcode, Bazel, and Tuist** projects end-to-end as of v1.3.0; Tuist routes through `tuist_adapter` (which owns `tuist generate` and delegates to `xcode_adapter` against the generated workspace), Bazel routes through `bazel_adapter`, Xcode is the canonical path. F1–F9 rules fire identically across build systems where the underlying concept applies; Xcode-only build settings (F4 / F9 / sandboxing / fuse) are suppressed on Bazel projects so no spurious findings surface. Bazel-aware F1/F3 fixers ship as informational stubs with manual recipes in v1.3; buildozer-backed BUILD.bazel auto-apply lands in v1.4. When fix.py can't deliver, refused-* outcomes are surfaced verbatim, not masked. Manual-only rules (F5/F6/F7) are always routed through fix.py with --allow-manual so the no-op fix-result is captured for tuning data, never short-circuited to a recipe-only path. Use when the user wants the full doctor-loop in one transcript, not just one step.
 ---
 
 # `ios-build-doctor`
@@ -13,7 +13,7 @@ Reach for this skill when the user wants the **full loop** answer:
 
 - "Run the doctor on this project."
 - "Give me one transcript that shows everything — measure, find, fix, re-measure."
-- "I want the SwiftCraft-style demo against this checkout."
+- "I want the build-doctor walkthrough against this checkout."
 
 If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure/SKILL.md). For just the audit, use [`ios-build-diagnose`](../ios-build-diagnose/SKILL.md). For predicted Δ, use [`ios-build-simulate`](../ios-build-simulate/SKILL.md). For one approved fix end-to-end (no questionnaire / no top-N), use [`ios-build-fix`](../ios-build-fix/SKILL.md).
 
@@ -37,7 +37,7 @@ If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure
 | `--allow-manual` | no | off | Always forwarded to fix.py — manual rules (F5/F6/F7) emit `refused-null` fix-result for tuning data instead of being short-circuited. |
 | `--rule-id RULE` | no | — | Skip the top-N approval prompt; pre-pick this rule. Used by smoke runs. |
 | `--non-interactive` | no | off | Refuse to prompt; require `--rule-id`. |
-| `--transcript-path PATH` | no | `<output-dir>/swiftcraft-loop.md` | Override transcript location. |
+| `--transcript-path PATH` | no | `<output-dir>/build-doctor-walkthrough.md` | Override transcript location. |
 | `--keep-worktree` | no | off | Skip `git worktree remove` for post-mortem inspection. |
 | `--no-verify-commits` | no | off | Forwarded to fix.py for projects whose hooks gate on branch-name patterns. |
 | `--goal {baseline,find,apply}` | no | `find` | Q8: `baseline` stops after measure, `find` is the full loop, `apply` requires `--rule-id` and skips the top-N gate. |
@@ -58,7 +58,7 @@ If the user wants just baselines, use [`ios-build-measure`](../ios-build-measure
     - `gap = |predicted - actual|`
     - `error_pct = 100 × gap / |predicted|` (or absolute tolerance when `predicted = 0`).
 12. **Worktree teardown**. `git worktree remove --force <path>` unless `--keep-worktree`. Fallback: `rmtree` + `git worktree prune`.
-13. **Write transcript**. Eight-section markdown at `<output-dir>/swiftcraft-loop.md` (override with `--transcript-path`). The transcript is auto-generated; Claude may post-edit lightly before committing the canonical demo copy at `docs/demo/swiftcraft-loop-<date>.md`.
+13. **Write transcript**. Eight-section markdown at `<output-dir>/build-doctor-walkthrough.md` (override with `--transcript-path`). The transcript is auto-generated; Claude may post-edit lightly before committing the canonical demo copy at `docs/demo/build-doctor-walkthrough-<date>.md`.
 
 ## The questionnaire
 
@@ -96,7 +96,7 @@ This means manual rules are never silently skipped or routed to a parallel "reci
 ```
 <output-dir>/
   run.json                         # doctor metadata: run_id, args, started/finished, outcome
-  swiftcraft-loop.md               # the transcript artifact (override with --transcript-path)
+  build-doctor-walkthrough.md      # the transcript artifact (override with --transcript-path)
   measurement/
     measurement.json
     runs-{clean,incremental}/...
