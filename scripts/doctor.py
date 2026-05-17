@@ -153,7 +153,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--non-interactive", action="store_true",
         help="Refuse if any required answer is missing from CLI flags.")
     parser.add_argument("--transcript-path", type=pathlib.Path, default=None,
-        help="Override transcript path (default: <output-dir>/swiftcraft-loop.md).")
+        help="Override transcript path (default: <output-dir>/build-doctor-walkthrough.md).")
     parser.add_argument("--keep-worktree", action="store_true",
         help="Skip 'git worktree remove' for post-mortem inspection.")
     parser.add_argument("--worktree-seed-ref", default="develop",
@@ -203,7 +203,7 @@ def _resolve_questionnaire(args: argparse.Namespace) -> DoctorContext:
     transcript_path = (
         args.transcript_path.resolve()
         if args.transcript_path is not None
-        else output_dir / "swiftcraft-loop.md"
+        else output_dir / "build-doctor-walkthrough.md"
     )
 
     return DoctorContext(
@@ -669,7 +669,7 @@ def _write_transcript(
 ) -> None:
     notes = extra_notes or []
     lines: list[str] = []
-    lines.append(f"# SwiftCraft demo: iOS build doctor on {ctx.project_path.name}")
+    lines.append(f"# Build doctor walkthrough on {ctx.project_path.name}")
     lines.append(
         f"_Run id: {ctx.run_id}, doctor.py {__version__}, "
         f"started {ctx.started_at}, finished {ctx.finished_at}_"
