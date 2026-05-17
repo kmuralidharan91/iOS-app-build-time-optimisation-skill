@@ -109,8 +109,14 @@ class DiagnosisContext:
     platform: str
     measurement: dict[str, Any] | None  # parsed measurement.json (benchmark artifact)
     resolved_settings: dict[str, str]
-    script_phases: list[Any]   # list[ScriptPhase] from xcode_adapter
-    package_graph: Any | None  # PackageGraph from xcode_adapter
+    script_phases: list[Any]   # list[ScriptPhase] from {xcode,bazel,tuist}_adapter
+    package_graph: Any | None  # PackageGraph from {xcode,bazel,tuist}_adapter
+    # Detected build system: "xcode" | "bazel" | "tuist". Analyzers use
+    # this to suppress rules that key off Xcode-only settings when the
+    # project is a Bazel build (e.g. F4 COMPILATION_CACHE_ENABLE_CACHING
+    # has no Bazel analogue). Default "xcode" preserves the pre-v1.3
+    # behaviour for any analyzer that doesn't explicitly opt in.
+    build_system: str = "xcode"
 
     def has_resolved_settings(self) -> bool:
         return bool(self.resolved_settings)

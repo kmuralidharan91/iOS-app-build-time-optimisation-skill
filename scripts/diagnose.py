@@ -43,7 +43,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from adapters import PackageGraph, detect_build_system  # noqa: E402
-from adapters import bazel_adapter, xcode_adapter  # noqa: E402
+from adapters import bazel_adapter, tuist_adapter, xcode_adapter  # noqa: E402
 from analyzers import (  # noqa: E402
     DiagnosisContext,
     Finding,
@@ -235,18 +235,78 @@ def _build_context(
             resolved_settings=resolved,
             script_phases=phases,
             package_graph=package_graph_value,
+            build_system=build_system,
+        )
+        return context, notes
+
+    if build_system == "tuist":
+        # v1.3: route Tuist projects through tuist_adapter. The adapter
+        # owns `tuist generate` and then delegates to xcode_adapter for
+        # the three diagnose calls — the generated *.xcworkspace is a
+        # real Xcode workspace, so the existing parsers handle the
+        # pbxproj, Package.resolved, and -showBuildSettings output
+        # unchanged. Analyzers see Xcode-shaped data and fire identical
+        # rules.
+        if resolved_settings_json is not None:
+            resolved = _load_resolved_settings_dump(resolved_settings_json)
+            notes.append(
+                "Loaded resolved build settings from "
+                f"{resolved_settings_json}; live xcodebuild not invoked."
+            )
+        elif skip_xcodebuild:
+            resolved = {}
+            notes.append(
+                "--skip-xcodebuild was set; tuist generate is skipped "
+                "for build-setting findings (F4, F9) and PR-#2 "
+                "recommendations short-circuit."
+            )
+        else:
+            resolved = tuist_adapter.show_build_settings(
+                project_path,
+                scheme=scheme,
+                configuration=configuration,
+                platform=platform,
+            )
+            if not resolved:
+                notes.append(
+                    "tuist generate + xcodebuild -showBuildSettings "
+                    "returned nothing; build-setting findings "
+                    "short-circuit. Re-run with tuist on PATH (via mise "
+                    "or Homebrew) or pass --resolved-settings-json PATH."
+                )
+
+        phases = tuist_adapter.script_phases(project_path, platform=platform)
+        package_graph_value = tuist_adapter.package_graph(
+            project_path,
+            platform=platform,
+        )
+        notes.append(
+            f"adapter=tuist: diagnose surfaces wired via tuist_adapter "
+            f"(post-`tuist generate` delegation to xcode_adapter; "
+            f"script_phases={len(phases)} phase(s), "
+            f"package_graph.pins={len(package_graph_value.pins)}, "
+            f"package_graph.local_modules={len(package_graph_value.local_modules)})."
+        )
+        context = DiagnosisContext(
+            project_path=project_path,
+            scheme=scheme,
+            configuration=configuration,
+            platform=platform,
+            measurement=measurement,
+            resolved_settings=resolved,
+            script_phases=phases,
+            package_graph=package_graph_value,
+            build_system=build_system,
         )
         return context, notes
 
     if build_system != "xcode":
-        # Tuist (or any future build system) still falls through here:
-        # the v1 fence in doctor.py blocks Tuist before we get this far,
-        # but benchmark.py can route diagnose against a Tuist project
-        # directly, so we keep the safe short-circuit.
+        # Any future build system falls through here as a safe
+        # short-circuit. detect_build_system() raises on unrecognised
+        # projects so this branch is effectively defensive.
         notes.append(
-            f"adapter={build_system!r} not yet wired for diagnose; v1.2 "
-            f"ships Xcode + Bazel diagnose. Tuist diagnose lands in v1.x "
-            f"once a Tuist-shaped smoke target is on disk."
+            f"adapter={build_system!r} not wired for diagnose; v1.3 "
+            f"ships Xcode + Bazel + Tuist diagnose."
         )
         context = DiagnosisContext(
             project_path=project_path,
@@ -257,6 +317,7 @@ def _build_context(
             resolved_settings={},
             script_phases=[],
             package_graph=PackageGraph(pins=(), local_modules=()),
+            build_system=build_system,
         )
         return context, notes
 
@@ -300,6 +361,7 @@ def _build_context(
         resolved_settings=resolved,
         script_phases=phases,
         package_graph=package_graph_value,
+        build_system=build_system,
     )
     return context, notes
 
@@ -363,7 +425,7 @@ def diagnose(
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "project": {
             "path": str(project_path),
-            "build_system": "xcode",
+            "build_system": context.build_system,
             "git_sha": _git_sha(project_path),
             "git_branch": _git_branch(project_path),
             "platform": platform,

@@ -25,6 +25,17 @@ Findings (counted toward F1–F9 recall):
 Additional recommendations (PR-#2; counted separately):
 - ``build-setting/script-sandboxing-disabled``       — ENABLE_USER_SCRIPT_SANDBOXING
 - ``build-setting/fuse-build-script-phases-disabled`` — FUSE_BUILD_SCRIPT_PHASES
+
+Build-system suppression (v1.3): F4, F9, sandboxing, and fuse all key off
+Xcode-specific build settings (``COMPILATION_CACHE_ENABLE_CACHING``,
+``EAGER_LINKING``, ``ENABLE_USER_SCRIPT_SANDBOXING``,
+``FUSE_BUILD_SCRIPT_PHASES``). Bazel has no analogue for any of them —
+build caching is a CLI flag (``--disk_cache``), eager linking is a
+``linkopts`` decision, sandboxing is per-action via the
+``apple_support`` toolchain. So when ``context.build_system == "bazel"``,
+all four checks are skipped to eliminate spurious findings. A future
+v1.4+ may emit ``B4-bazel-cache-not-configured`` as an informational
+recommendation by inspecting ``.bazelrc`` for ``--disk_cache``.
 """
 
 from __future__ import annotations
@@ -50,6 +61,11 @@ def run(
 ) -> tuple[list[Finding], list[Recommendation]]:
     findings: list[Finding] = []
     recommendations: list[Recommendation] = []
+
+    if context.build_system == "bazel":
+        # All four checks key on Xcode-specific build settings that have
+        # no equivalent in Bazel. Skip cleanly; no spurious findings.
+        return findings, recommendations
 
     if not context.has_resolved_settings():
         # Caller already adds a top-level note; no per-rule output.

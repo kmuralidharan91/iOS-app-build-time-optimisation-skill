@@ -4,6 +4,99 @@ All notable changes to this project. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-05-17
+
+### Added
+
+- **Tuist end-to-end.** `tuist_adapter` implements `measure()`,
+  `show_build_settings()`, `script_phases()`, and `package_graph()`.
+  `measure()` runs `tuist generate --no-open` (auto-resolved via
+  `mise exec -- tuist` when no bare `tuist` binary is on PATH) then
+  delegates the timed build to `xcode_adapter.measure()` against the
+  generated `*.xcworkspace`; the other three surfaces delegate to
+  `xcode_adapter` directly because Tuist generates a real Xcode
+  workspace with stock `project.pbxproj`, `Package.resolved`, and
+  `Package.swift` artefacts that the existing parsers handle
+  unchanged. Verified against `tests/tuist-smoke-ios/` (Tuist 4.191.5,
+  Xcode 26.5): clean median 2.258 s, incremental 1.811 s; diagnose
+  fires 2 findings (F4, F9) + 2 recommendations.
+- **`ios-build-doctor` v1 fence dropped for Tuist.** All three build
+  systems (Xcode, Bazel, Tuist) now run the full
+  questionnaire → measure → diagnose → simulate → fix loop. The
+  `abort:tuist-v1-fence` outcome string is gone; `_exit_code_for()`
+  no longer special-cases it. Detection unchanged.
+- **F1–F9 calibrated for Bazel.** The `build_setting` analyzer now
+  short-circuits cleanly when `context.build_system == "bazel"`:
+  F4 (`COMPILATION_CACHE_ENABLE_CACHING`), F9 (`EAGER_LINKING`),
+  ENABLE_USER_SCRIPT_SANDBOXING, and FUSE_BUILD_SCRIPT_PHASES all key
+  off Xcode-specific build settings with no Bazel analogue. v1.2 fired
+  all four spuriously on Bazel projects; v1.3 emits zero findings for
+  them. F1 (script-phase/random-sleep), F3 (script-phase/
+  missing-output-declarations), F8 (script-phase/swiftlint-on-build),
+  F6 (spm/swift-syntax-not-prebuilt), and F7 (spm/oversized-module) are
+  build-system-agnostic by design (they consume `ScriptPhase` /
+  `PackageGraph` dataclasses which `bazel_adapter` populates from
+  `bazel query` and the project tree) and fire identically on Bazel
+  projects. Verified against the enhanced
+  `tests/bazel-smoke-ios/`: F1+F3+F8 fire on the `LintAndStamp`
+  genrule fixture; F6 fires on the `LocalPkg` Package.resolved
+  fixture; F4/F9/sandboxing/fuse stay quiet.
+- **Bazel-aware fixers via informational stubs.** `apply_random_sleep`
+  (F1) and `apply_missing_output_declarations` (F3) dispatch on
+  `ctx.diagnosis["project"]["build_system"]`. The Bazel branch returns
+  a no-op `AppliedFix` plus a manual recipe in `preview_*`. Outcome is
+  `refused-null` per the existing fix.py informational-fixer contract.
+  Auto-applying BUILD.bazel rewriters requires Starlark AST
+  manipulation (e.g. buildozer); v1.4 ships the auto-apply.
+- **`DiagnosisContext.build_system` field.** The diagnose context now
+  carries the detected build system so analyzers can do build-system-
+  aware filtering. Diagnosis artefact's `project.build_system` is now
+  the actual detection result (was hardcoded `"xcode"` in v1.2).
+- **`tests/tuist-smoke-ios/`.** Minimal Tuist iOS smoke target
+  (Project.swift + 3 Swift sources, mise-pinned Tuist 4.191.5). Used
+  to verify the Tuist measurement loop end-to-end without depending on
+  a third-party Tuist project.
+- **Enhanced `tests/bazel-smoke-ios/`.** Added `Lib/MathKit`
+  (second `swift_library` depending on `SmokeLib`, gives the critical
+  path a 2-node chain), `App/LintAndStamp` (deliberately-broken
+  genrule fixture that triggers F1/F3/F8), and `Packages/LocalPkg/`
+  (local SPM package with a `Package.resolved` pinning swift-syntax
+  510.0.3 so F6 fires).
+- **`mise exec` fallback for Tuist resolution.** The Tuist adapter
+  prefers a bare `tuist` on PATH but falls back to
+  `["mise", "exec", "--", "tuist"]` so a project's `.mise.toml`
+  pinned version is honoured automatically.
+
+### Known limitations (deferred to v1.4)
+
+- **F5 (asset-catalog/incremental-recompile)** keys on the Xcode-
+  specific task class name `CompileAssetCatalogVariant`. Bazel
+  chrome-trace events use different action names (e.g.
+  `AppleAssetCatalog`); v1.3 doesn't add a Bazel matcher, so F5 is a
+  false-negative on Bazel projects (no spurious fires; just doesn't
+  catch the case).
+- **BUILD.bazel auto-apply for F1 / F3.** Informational stubs ship in
+  v1.3 with manual recipes in `preview_*`. v1.4 will ship buildozer-
+  backed apply functions that mutate the `cmd` and `outs` attributes
+  in-place.
+- **wikipedia-ios-bazel real-corpus measurement** remains paused at
+  the WMF Framework Swift↔Obj-C interop cycle. The blocker is
+  architectural (the upstream codebase mixes Obj-C base types and
+  Swift-derived types in the same Bazel module, creating a circular
+  module-map dependency that requires splitting the WMF target into
+  pre-Swift and post-Swift halves). This is upstream-codebase work
+  rather than skill-side rule work and is deferred to v1.4.
+
+### Verification corpus
+
+- `tests/tuist-smoke-ios/` — Tuist 4.191.5 / Xcode 26.5 / 3 reps:
+  clean 2.258 s, incremental 1.811 s. Diagnose: 2 findings + 2 recs.
+- `tests/bazel-smoke-ios/` (enhanced) — Bazel 9.1.0 / rules_swift
+  3.6.1 / 3 reps: clean 19.898 s (spread 12.04 %), incremental 0.136 s.
+  Diagnose: 4 findings (F1+F3+F6+F8), 0 spurious recs.
+- All three build systems pass `python3 scripts/doctor.py` end-to-end
+  with no `abort:*` outcomes.
+
 ## [1.2.0] — 2026-05-16
 
 ### Added

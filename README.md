@@ -2,7 +2,7 @@
 
 > **Benchmark, diagnose, simulate, and fix iOS build-time problems** across Xcode, Tuist, and Bazel — recommend-first, citation-required, refuses to claim wins it can't measure.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-1.2.0-brightgreen.svg)](CHANGELOG.md) [![Agent Skills](https://img.shields.io/badge/agent--skills-open%20standard-orange.svg)](https://agentskills.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-1.3.0-brightgreen.svg)](CHANGELOG.md) [![Agent Skills](https://img.shields.io/badge/agent--skills-open%20standard-orange.svg)](https://agentskills.io)
 
 Five [Agent Skills](https://agentskills.io) for Claude Code, Cursor, GitHub Copilot, OpenAI Codex, and Windsurf.
 
@@ -175,19 +175,20 @@ Every change goes to a throwaway git branch. Re-measure runs after. Refuses on n
 
 - **NetNewsWire** @ `build-comparison-base` (upstream: [Ranchero-Software/NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)) — pure Xcode + F3/F4/F9 fix-apply target. On a 28-second baseline all three rules refused to claim measurable wins; variance noise dominated. That refusal is the gate working as designed (see [Why "refused" is the headline feature](#why-refused-is-the-headline-feature)).
 - **Wikipedia-iOS** @ [`9200297c15`](https://github.com/wikimedia/wikipedia-ios/commit/9200297c15) — pure Xcode + Tuist-migration POC at `113cbb6f26`. The same rules predict 45 %+ clean-build improvements on the larger codebase.
-- **Bazel** (v1.2.0) — full diagnose surface ships end-to-end against [`tests/bazel-smoke-ios/`](tests/bazel-smoke-ios/). Measurement: clean 21.153 s, incremental 0.298 s after touch. Critical path: parsed from the chrome-trace profile (method=`bazel-critical-path`). Diagnose: `script_phases` from `bazel query --output=xml`, `package_graph` from `Package.resolved` + local `Package.swift`, `show_build_settings` from `bazel info` + `bazel cquery --output=jsonproto`. Bazel-specific rule variants land in v1.3.
+- **Bazel** (v1.3.0) — full doctor loop ships end-to-end. Measure → diagnose → simulate → fix all run against [`tests/bazel-smoke-ios/`](tests/bazel-smoke-ios/). Enhanced v1.3 fixture: clean median 19.898 s (spread 12.04 %), incremental 0.136 s; critical path 2 nodes (`bazel-critical-path` method), longest chain 9.75 s; diagnose fires 4 findings (F1 + F3 + F8 on the `LintAndStamp` genrule, F6 on the LocalPkg `Package.resolved`); F4 / F9 / sandboxing / fuse are correctly suppressed (Xcode-only settings have no Bazel analogue). Bazel-aware F1/F3 fixers ship as informational stubs with manual recipes; buildozer-backed auto-apply lands in v1.4.
+- **Tuist** (v1.3.0) — full doctor loop ships end-to-end against [`tests/tuist-smoke-ios/`](tests/tuist-smoke-ios/). `tuist_adapter.measure()` runs `tuist generate --no-open` (via `mise exec` when needed) then delegates to `xcode_adapter` against the generated `*.xcworkspace`. Measurement: clean 2.258 s, incremental 1.811 s. Diagnose fires 2 findings + 2 recommendations (Tuist generates a real xcconfig, so F4/F9/sandboxing/fuse fire as on a stock Xcode project).
 
-## Roadmap (v1.3)
+## Roadmap (v1.4)
 
-Annotated `(deferred to v1.3)` in [`references/defaults.md`](references/defaults.md); full notes in [`CHANGELOG.md`](CHANGELOG.md).
+Annotated `(deferred to v1.4)` in [`CHANGELOG.md`](CHANGELOG.md).
 
-- **F1 magnitude** — neither corpus has a `sleep $RANDOM` pattern; awaits a triggering project.
+- **F1 magnitude** — neither public corpus has a `sleep $RANDOM` pattern; awaits a triggering project.
 - **F2 measured Δ** — ships as informational manual recipe; auto-apply Δ awaits a triggering artifact-upload phase.
-- **F6 magnitude** — neither corpus pulls swift-syntax; awaits a macro-using project.
-- **Bazel-specific rule variants** — upstream rules (F1–F9) are still calibrated on Xcode settings. On a Bazel project they fire a mix of valid + spurious findings; v1.3 adjusts the catalog with Bazel-specific equivalents.
-- **Bazel-specific fixers** — `fix.py` is Xcode-only. v1.3 adds genrule rewriters and `MODULE.bazel` patch-and-rebuild.
-- **Tuist end-to-end** — `tuist_adapter.measure()` against a Tuist-shaped smoke target.
-- **Visual assets** (banner, doctor-loop GIF, screenshot) — v1.0.1 patch.
+- **F5 Bazel matcher** — `CompileAssetCatalogVariant` task class name is Xcode-only; Bazel chrome-trace uses different action names. v1.4 adds a Bazel-aware matcher so F5 fires on Bazel projects too.
+- **F6 magnitude on real-world projects** — the smoke target's swift-syntax pin is fixture; awaits a macro-using public corpus measurement.
+- **Bazel auto-apply fixers** — F1 / F3 ship as informational stubs in v1.3. v1.4 adds buildozer-backed BUILD.bazel rewriters.
+- **wikipedia-ios Bazel real-corpus measurement** — paused at the WMF Framework Swift↔Obj-C interop cycle (architectural refactor in the upstream codebase, not skill-side work).
+- **Visual assets** (banner, doctor-loop GIF, screenshot) — separate patch.
 
 ## Repository layout
 

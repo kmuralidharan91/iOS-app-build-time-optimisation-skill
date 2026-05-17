@@ -10,6 +10,21 @@ genrule(
     cmd = "date -u +%Y%m%d%H%M%S > $@",
 )
 
+# Deliberately-broken twin genrule used as a v1.3 fixture for the
+# script-phase analyzer. The cmd contains a `sleep $RANDOM` so F1
+# (script-phase/random-sleep) fires; outs = [] makes F3 fire
+# (script-phase/missing-output-declarations). The body also references
+# `swiftlint` so F8 (script-phase/swiftlint-on-build) fires. We never
+# build //App:LintAndStamp (the main //App:SmokeLib build skips it);
+# bazel query reads BUILD.bazel without running analysis, so the
+# empty-outs declaration is fine for diagnose-only purposes.
+genrule(
+    name = "LintAndStamp",
+    outs = [],
+    cmd = "sleep $$[ ( $$RANDOM % 5 ) + 1 ]s; swiftlint lint --quiet 2>/dev/null || true; date -u +%Y%m%d%H%M%S",
+    tags = ["no-cache", "manual"],
+)
+
 swift_library(
     name = "SmokeLib",
     module_name = "SmokeLib",
