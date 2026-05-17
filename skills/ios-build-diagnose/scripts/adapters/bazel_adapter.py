@@ -318,11 +318,20 @@ def _parse_query_xml_genrules(xml_text: str) -> list[ScriptPhase]:
             tags & _GENRULE_ALWAYS_OUT_OF_DATE_TAGS
         ) or not outs
 
+        # Bazel uses Make-style ``$$`` to escape a literal ``$`` in
+        # genrule cmd attributes. The upstream script_phase analyzer
+        # operates on the shell text that actually runs at build time,
+        # so we normalise ``$$`` -> ``$`` before populating
+        # ``ScriptPhase.script``. Without this, patterns like
+        # ``sleep $$RANDOM`` (F1) and ``swiftlint`` invocations (F8)
+        # silently miss because the regex sees the un-expanded form.
+        normalised_cmd = (cmd or "").replace("$$", "$")
+
         phases.append(
             ScriptPhase(
                 target=target,
                 name=name,
-                script=cmd or "",
+                script=normalised_cmd,
                 input_paths=srcs,
                 output_paths=outs,
                 always_out_of_date=always_out_of_date,

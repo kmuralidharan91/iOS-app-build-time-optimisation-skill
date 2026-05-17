@@ -1,0 +1,15 @@
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+
+# Second swift_library — gives the smoke target two compile DAG nodes
+# so the chrome-trace critical path has more than a single entry,
+# exercising critical_path.py's longest-chain logic against a real DAG.
+swift_library(
+    name = "MathKit",
+    module_name = "MathKit",
+    srcs = [
+        "Adder.swift",
+        "Multiplier.swift",
+    ],
+    deps = ["//App:SmokeLib"],
+    visibility = ["//visibility:public"],
+)

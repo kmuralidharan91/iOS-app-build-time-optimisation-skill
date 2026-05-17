@@ -29,11 +29,55 @@ _RANDOM_SLEEP_PATTERN = re.compile(
 )
 
 
+def _is_bazel_diagnosis(ctx: FixContext) -> bool:
+    """Return True when the diagnosis was produced against a Bazel project.
+
+    The Bazel auto-apply path is deferred to v1.4 — BUILD.bazel files
+    are Starlark and editing the ``cmd`` attribute safely requires AST
+    manipulation (buildozer) rather than line-based substitution. v1.3
+    surfaces the same F1/F3 findings on Bazel projects but routes the
+    fixer through the manual-recipe path (the same shape F8 already
+    uses on Xcode).
+    """
+
+    return (ctx.diagnosis.get("project") or {}).get("build_system") == "bazel"
+
+
 def preview_random_sleep(
     findings: list[tuple[int, dict[str, Any]]],
     ctx: FixContext,
 ) -> str:
     """Return a human-readable diff preview for the F1 fix."""
+
+    if _is_bazel_diagnosis(ctx):
+        bullets = []
+        for _idx, finding in findings:
+            evidence = finding.get("evidence") or {}
+            path = evidence.get("path", "<unknown>")
+            raw = (evidence.get("raw") or "").strip().replace("\n", " ")[:120]
+            bullets.append(f"  - {path}: {raw}")
+        body = "\n".join(bullets) if bullets else "  (no findings)"
+        return (
+            "F1 script-phase/random-sleep on Bazel — informational in v1.3.\n"
+            "Auto-apply against BUILD.bazel is deferred to v1.4: safely\n"
+            "editing a genrule's `cmd` attribute requires Starlark AST\n"
+            "manipulation (e.g. buildozer); naive line substitution is\n"
+            "unsafe against multi-line cmd strings and select() wrappers.\n"
+            "Recipe — open each affected BUILD.bazel and remove the\n"
+            "`sleep $RANDOM` from the genrule's cmd:\n"
+            f"{body}\n"
+            "Example fix in App/BUILD.bazel:\n"
+            "  genrule(\n"
+            "      name = \"VersionStamp\",\n"
+            "      outs = [\"version.txt\"],\n"
+            "-     cmd = \"sleep $$RANDOM; date -u +%s > $@\",\n"
+            "+     cmd = \"date -u +%s > $@\",\n"
+            "  )\n"
+            "Note: Bazel uses `$$` to escape a literal `$` in genrule\n"
+            "cmd attributes (Make-style), so what runs at build time is\n"
+            "`sleep $RANDOM` — the same anti-pattern as in an Xcode\n"
+            "PBXShellScriptBuildPhase."
+        )
 
     lines = ["F1 random-sleep — delete one literal line per finding:"]
     for idx, finding in findings:
@@ -62,6 +106,16 @@ def apply_random_sleep(
     replaced. On any error during the loop, ``ApplyError`` is raised; the
     orchestrator handles the ``git reset --hard`` rollback.
     """
+
+    if _is_bazel_diagnosis(ctx):
+        return _no_op(
+            ctx,
+            "F1 fixer is informational on Bazel in v1.3; editing a "
+            "genrule's cmd attribute safely requires Starlark AST "
+            "manipulation (e.g. buildozer). v1.4 will ship the "
+            "buildozer-backed auto-apply. See the preview for the "
+            "manual recipe.",
+        )
 
     sha_before = _git_head(ctx.project_root)
     files_modified: list[str] = []
@@ -131,6 +185,38 @@ def preview_missing_output_declarations(
     PR-#2 fuse-only band of -7s clean / -5.6s incremental.
     """
 
+    if _is_bazel_diagnosis(ctx):
+        bullets = []
+        for _idx, finding in findings:
+            evidence = finding.get("evidence") or {}
+            path = evidence.get("path", "<unknown>")
+            bullets.append(f"  - {path}")
+        body = "\n".join(bullets) if bullets else "  (no findings)"
+        return (
+            "F3 script-phase/missing-output-declarations on Bazel — "
+            "informational in v1.3.\n"
+            "Bazel's analogue is a genrule without declared `outs` (or\n"
+            "tagged `no-cache` / `manual`). Auto-apply requires knowing\n"
+            "what file(s) the cmd actually produces; this can't be\n"
+            "inferred safely without per-cmd inspection, so v1.3 ships a\n"
+            "manual recipe.\n"
+            "Affected genrules:\n"
+            f"{body}\n"
+            "Example fix in App/BUILD.bazel:\n"
+            "  genrule(\n"
+            "      name = \"LintAndStamp\",\n"
+            "-     outs = [],\n"
+            "+     outs = [\"lint.log\", \"stamp.txt\"],\n"
+            "      cmd = \"swiftlint > $(location lint.log); "
+            "date > $(location stamp.txt)\",\n"
+            "  )\n"
+            "Declaring outs lets Bazel cache the action and skip\n"
+            "re-running when inputs are unchanged. The Xcode-side fix\n"
+            "(enabling `FUSE_BUILD_SCRIPT_PHASES` in xcconfig) has no\n"
+            "Bazel equivalent — there is no Bazel-wide flag to fuse all\n"
+            "genrules; the per-rule `outs` declaration is the lever."
+        )
+
     xcconfig = _f3_xcconfig_target(ctx.project_root)
     return (
         f"F3 missing-output-declarations — enable fuse via "
@@ -157,6 +243,15 @@ def apply_missing_output_declarations(
     → ** BUILD FAILED **. Public-corpus measured Δ for the fuse-only
     fix lands in build-benchmarks/netnewswire/fix-F3/.
     """
+
+    if _is_bazel_diagnosis(ctx):
+        return _no_op(
+            ctx,
+            "F3 fixer is informational on Bazel in v1.3; Bazel's "
+            "equivalent (declaring `outs` on a genrule) requires per-cmd "
+            "knowledge of what the script produces and can't be safely "
+            "auto-applied. See the preview for the manual recipe.",
+        )
 
     xcconfig = _f3_xcconfig_target(ctx.project_root)
     sha_before = _git_head(ctx.project_root)
